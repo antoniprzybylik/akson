@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "akson",
+    "akson-python",
+]
+
+[workspace.package]
+version = "0.0.1-dev"
+authors = ["Antoni Przybylik <antoni.przybylik@wp.pl>"]
+license = "GPL-2.0"
+repository = "https://github.com/antoniprzybylik/akson"
+description = "Software package for efficient design of control systems"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+
+[profile.release]
+lto = true

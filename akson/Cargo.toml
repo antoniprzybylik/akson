@@ -1,0 +1,27 @@
+[package]
+name = "akson"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+tch = {version="0.18.1", features=["serde_json"]}
+serde = "1.0.219"
+thiserror = "2.0.12"
+anyhow = "1.0.97"
+
+[dev-dependencies]
+criterion = { version="0.5.1", features=["html_reports"] }
+
+[[bench]]
+name = "benchmark_discretize"
+harness = false
+
+[package.metadata.docs.rs]
+rustdoc-args = [ "--html-in-header", "./html_src/docs-header.html" ]
+
+[lints]
+workspace = true

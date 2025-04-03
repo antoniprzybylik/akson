@@ -1,0 +1,21 @@
+[package]
+name = "akson-python"
+edition = "2021"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+akson = { path = "../akson" }
+pyo3 = { version = "0.21.2", features=["extension-module", "abi3", "abi3-py39"] }
+pyo3-tch = { version = "0.18.1" }
+torch-sys = { version = "0.18.1" }
+tch = { version = "0.18.1" }
+
+[package.metadata.maturin]
+extension-module = true
+
+[lints]
+workspace = true
