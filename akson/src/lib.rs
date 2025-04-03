@@ -325,6 +325,7 @@ impl ContinousFiniteLTISystem {
         })
     }
 
+    /// Construct the system from transfer function coefficients.
     pub fn from_tf(
         numerator: Tensor,
         denominator: Tensor,
@@ -484,7 +485,7 @@ impl ContinousFiniteLTISystem {
         })
     }
 
-    /// Discretizes the system
+    /// Discretizes the system.
     ///
     /// For discretization, the following formulas are used:
     /// $$
