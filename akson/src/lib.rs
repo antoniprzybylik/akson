@@ -484,6 +484,18 @@ impl ContinousFiniteLTISystem {
         })
     }
 
+    /// Discretizes the system
+    ///
+    /// For discretization, the following formulas are used:
+    /// $$
+    /// \begin{aligned}
+    /// A_d &= e^{T \cdot A} \\\\
+    /// B_d &= A^{-1}(A_d - I) B \\\\
+    /// C_d &= C \\\\
+    /// D_d &= D
+    /// \end{aligned}
+    /// $$
+    /// Where $T$ is the discrete system time constant.
     pub fn discretize(&self, t: f64) -> DiscreteFiniteLTISystem {
         let discrete_a = (&self.state_matrix_a * t).linalg_matrix_exp();
 
