@@ -9,7 +9,7 @@ description.workspace = true
 
 [dependencies]
 akson = { path = "../akson" }
-pyo3 = { version = "0.21.2", features=["extension-module", "abi3", "abi3-py39"] }
+pyo3 = { version = "0.21.2", features = ["extension-module", "abi3", "abi3-py39"] }
 pyo3-tch = { version = "0.19.0" }
 torch-sys = { version = "0.19.0" }
 tch = { version = "0.19.0" }
