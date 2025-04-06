@@ -325,6 +325,10 @@ impl ContinousFiniteLTISystem {
         })
     }
 
+    fn current_output(&self) -> Tensor {
+        self.output_matrix_c.mm(&self.state_x)
+    }
+
     /// Construct the system from transfer function coefficients.
     pub fn from_tf(
         numerator: Tensor,
@@ -764,6 +768,91 @@ impl DiscreteFeedbackSystem {
         self.system.simulate_from_current(&u).map_err(
             |e| anyhow!(format!("Failed to feed input to the system. Error message: {}", e))
         )
+    }
+}
+
+/// Errors that can occur in ContinousFeedbackSystem.
+#[derive(Error, Debug)]
+pub enum ContinousFeedbackSystemError {
+    /// Occurs when the time step is non-positive.
+    #[error("Time step must be positive, got {0}")]
+    InvalidTimeStep(f64),
+    /// Occurs when matrix operation fails
+    #[error("Matrix operation error: {0}")]
+    MatrixError(String),
+}
+
+/// Represents feedback system with discrete regulator and continuous controlled system.
+pub struct ContinousFeedbackSystem {
+    /// Discrete-time regulator
+    regulator: Box<dyn DiscreteRegulator<Reference = DiscretePIDReference> + Send>,
+    /// Continous system being controlled
+    system: ContinousFiniteLTISystem,
+    /// Discrete time step for control updates
+    time_step: f64,
+    /// Current simulation time
+    current_time: f64,
+}
+
+impl ContinousFeedbackSystem {
+    pub fn new(
+        regulator: Box<dyn DiscreteRegulator<Reference = DiscretePIDReference> + Send>,
+        system: ContinousFiniteLTISystem,
+        time_step: f64,
+    ) -> Result<Self, ContinousFeedbackSystemError> {
+        if time_step <= 0.0 {
+            return Err(ContinousFeedbackSystemError::InvalidTimeStep(time_step));
+        }
+
+        Ok(Self {
+            regulator,
+            system,
+            time_step,
+            current_time: 0.0,
+        })
+    }
+
+    pub fn step(&mut self, reference: &DiscretePIDReference) -> Result<Tensor, anyhow::Error> {
+        // 1. Compute control input based on current output
+        let y = self.system.current_output();
+        let u = self.regulator.compute_control(&y, reference)
+            .map_err(|e| anyhow!("Regulator error: {}", e))?
+            .reshape(&[1, 1]);  // Ensure 1x1 shape
+
+        let a = self.system.get_state_matrix_a();
+        let a_inv = a.inverse(); // Compute inverse once for efficiency
+        let b = self.system.get_input_matrix_b();
+        let c = self.system.get_output_matrix_c();
+        let d = self.system.get_feedthrough_matrix_d();
+        let x0 = self.system.get_state_x().shallow_clone();
+        let bu = b.matmul(&u);
+
+        // 2. Generate samples during the time_step interval
+        let num_samples = 10; // Number of internal samples per step
+        let outputs = Tensor::zeros(&[1, num_samples + 1], (a.kind(), a.device()));
+        let eye = Tensor::eye(a.size()[0], (a.kind(), a.device()));
+
+        for i in 0..=num_samples {
+            let tau = (i as f64 / num_samples as f64) * self.time_step;
+            let a_tau = a * tau;
+            let e_a_tau = a_tau.linalg_matrix_exp();
+            let adm1_tau = &e_a_tau - &eye;
+            let integral_term_tau = a_inv.matmul(&adm1_tau);
+            let x_tau = e_a_tau.matmul(&x0) + integral_term_tau.matmul(&bu);
+            let y_tau = c.matmul(&x_tau) + d.matmul(&u);
+            outputs.narrow(1, i as i64, 1).copy_(&y_tau);
+        }
+
+        // 3. Update system state to the end of the time_step
+        let a_dt = a * self.time_step;
+        let e_a_dt = a_dt.linalg_matrix_exp();
+        let adm1 = &e_a_dt - &eye;
+        let integral_term = a_inv.matmul(&adm1);
+        let x_next = e_a_dt.matmul(&x0) + integral_term.matmul(&bu);
+        self.system.set_state_x(x_next);
+        self.current_time += self.time_step;
+
+        Ok(outputs)
     }
 }
 

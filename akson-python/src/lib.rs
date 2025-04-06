@@ -4,6 +4,7 @@ use akson::ContinousFiniteLTISystem;
 use akson::DiscreteFiniteLTISystem;
 use akson::DiscretePIDRegulator;
 use akson::DiscreteFeedbackSystem;
+use akson::ContinousFeedbackSystem;
 use akson::DiscreteRegulator;
 use akson::DiscreteSystem;
 
@@ -130,6 +131,38 @@ impl PyDiscreteFeedbackSystem {
     }
 }
 
+#[pyclass(unsendable, dict, module = "rust", name = "ContinousFeedbackSystem")]
+pub struct PyContinousFeedbackSystem(ContinousFeedbackSystem);
+
+#[pymethods]
+impl PyContinousFeedbackSystem {
+    #[new]
+    fn new(
+        regulator: &PyDiscretePIDRegulator,
+        system: &PyContinousFiniteLTISystem,
+        time_step: f64,
+    ) -> PyResult<Self> {
+        let rust_regulator = Box::new(regulator.0.clone())
+            as Box<dyn DiscreteRegulator<Reference = akson::DiscretePIDReference> + Send>;
+
+        let rust_system = system.0.clone();
+
+        let feedback = ContinousFeedbackSystem::new(
+            rust_regulator,
+            rust_system,
+            time_step
+        ).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+        Ok(Self(feedback))
+    }
+
+    fn step(&mut self, reference: f64) -> PyResult<PyTensor> {
+        let output = self.0.step(&akson::DiscretePIDReference(reference))
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+        Ok(PyTensor(output))
+    }
+}
+
 #[pymodule]
 #[pyo3(name = "rust")]
 fn init_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -137,6 +170,7 @@ fn init_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDiscreteFiniteLTISystem>()?;
     m.add_class::<PyDiscretePIDRegulator>()?;
     m.add_class::<PyDiscreteFeedbackSystem>()?;
+    m.add_class::<PyContinousFeedbackSystem>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
