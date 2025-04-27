@@ -804,74 +804,65 @@ impl ContinousFeedbackSystem {
         })
     }
 
-    pub fn step(&mut self, reference: &Tensor) -> Result<Tensor, anyhow::Error> {
+    pub fn step(&mut self, reference: &Tensor) -> Result<(Tensor, Tensor), anyhow::Error> {
         // Compute control input using regulator
         let y = self.system.current_output();
         let u = self.regulator.compute_control(&y, reference)
             .map_err(|e| anyhow!("Regulator error: {}", e))?
             .reshape(&[1, 1]);
-
+    
         // Prepare system matrices and initial state
         let a = self.system.get_state_matrix_a();
         let b = self.system.get_input_matrix_b();
         let c = self.system.get_output_matrix_c();
         let d = self.system.get_feedthrough_matrix_d();
-        let x0 = self.system.get_state_x().squeeze(); // Convert to 1D tensor
-        let bu = b.matmul(&u).squeeze(); // Convert to 1D tensor
-
-        // Create sample inputs for tracing (time and state)
-        let t_sample = Tensor::from(0.0f64);
-        let x_sample = x0.shallow_clone();
-
-        // Create ODE function with captured A and bu
+        let x0 = self.system.get_state_x().squeeze(); // [state_size]
+        let bu = b.matmul(&u).squeeze(); // [state_size]
+    
+        // Create ODE function
         let a_clone = a.shallow_clone();
         let bu_clone = bu.shallow_clone();
         let mut closure = |inputs: &[Tensor]| {
-            let x = &inputs[1];
-
-            let x_col = x.unsqueeze(1);
-
-            let dx = a_clone.matmul(&x_col)
-                .squeeze()
-                + &bu_clone;
-
+            let x = &inputs[1]; // State vector [state_size]
+            let dx = a_clone.matmul(&x.unsqueeze(1)).squeeze() + &bu_clone;
             vec![dx]
         };
-
-        // Create traced module using create_by_tracing
+    
+        // Create traced module
         let ode_fn = CModule::create_by_tracing(
             "ode_fn",
             "forward",
-            &[t_sample, x_sample],
+            &[Tensor::from(0.0), x0.shallow_clone()],
             &mut closure,
         )?;
-
-        // Configure RK4 solver parameters
-        let t_span = Tensor::from_slice(&[0.0, self.time_step]); // [start, end]
+    
+        // Configure RK4 solver
+        let t_span = Tensor::from_slice(&[0.0, self.time_step]);
         let step_size = Tensor::from(self.time_step / 10.0);
-
-        // Solve the ODE using RK4
-        let (_, x_trajectory) = mini_ode::solve_rk4(
+    
+        // Solve the ODE - now capturing both time and state trajectories
+        let (t_points, x_trajectory) = mini_ode::solve_rk4(
             ode_fn,
             t_span,
-            x0.shallow_clone(), // Already 1D
+            x0.shallow_clone(),
             step_size,
         )?;
-
-        // Calculate outputs (convert back to 2D for matrix operations)
+    
+        // Calculate outputs at each time point
         let mut outputs = Vec::new();
         for i in 0..x_trajectory.size()[0] {
-            let x = x_trajectory.i(i).unsqueeze(1); // Convert to 2D [n, 1]
-            let y = c.matmul(&x) + d.matmul(&u);
+            let x = x_trajectory.i(i).unsqueeze(1); // [state_size, 1]
+            let y = c.matmul(&x) + d.matmul(&u);    // [1, 1]
             outputs.push(y);
         }
-        let outputs = Tensor::stack(&outputs, 1);
-
-        // Update system state (convert back to 2D)
+        let outputs = Tensor::stack(&outputs, 1); // [1, num_points]
+    
+        // Update system state
         self.system.set_state_x(x_trajectory.i(-1).unsqueeze(1));
         self.current_time += self.time_step;
-
-        Ok(outputs)
+    
+        // Return both time points and outputs
+        Ok((t_points, outputs))
     }
 }
 
