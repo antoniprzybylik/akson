@@ -34,6 +34,7 @@ version = "0.0.1-dev"
 dependencies = [
  "anyhow",
  "criterion",
+ "mini-ode",
  "serde",
  "tch",
  "thiserror 2.0.12",
@@ -525,6 +526,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "mini-ode"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b6cb06c3e050d027da4f21d193792ebdfea0d921a0e9e6fc9e5af9ec0b4e079"
+dependencies = [
+ "anyhow",
+ "tch",
 ]
 
 [[package]]
