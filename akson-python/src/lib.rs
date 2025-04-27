@@ -6,7 +6,7 @@ use akson::DiscreteFiniteLTISystem;
 use akson::DiscretePIDRegulator;
 use akson::DiscreteFeedbackSystem;
 use akson::ContinousFeedbackSystem;
-use akson::DiscreteRegulator;
+use akson::Regulator;
 use akson::DiscreteSystem;
 
 #[pyclass(dict, module = "rust", name = "ContinousFiniteLTISystem")]
@@ -118,7 +118,7 @@ impl PyDiscreteFeedbackSystem {
         regulator: &PyDiscretePIDRegulator,
         system: &PyDiscreteFiniteLTISystem,
     ) -> Self {
-        let rust_regulator = Box::new(regulator.0.clone()) as Box<dyn DiscreteRegulator + Send>;
+        let rust_regulator = Box::new(regulator.0.clone()) as Box<dyn Regulator + Send>;
         let rust_system = Box::new(system.0.clone()) as Box<dyn DiscreteSystem + Send>;
         Self(DiscreteFeedbackSystem::new(
             rust_regulator,
@@ -144,7 +144,7 @@ impl PyContinousFeedbackSystem {
         time_step: f64,
     ) -> PyResult<Self> {
         let rust_regulator = Box::new(regulator.0.clone())
-            as Box<dyn DiscreteRegulator + Send>;
+            as Box<dyn Regulator + Send>;
 
         let rust_system = system.0.clone();
 

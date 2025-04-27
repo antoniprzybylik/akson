@@ -66,7 +66,7 @@ pub enum DiscretePIDRegulatorError {
 }
 
 /// A trait representing a discrete-time regulator.
-pub trait DiscreteRegulator: Send {
+pub trait Regulator: Send {
     ///
     /// # Arguments
     /// * y - Tensor containing past system outputs and current system output
@@ -255,7 +255,7 @@ pub struct DiscretePIDReference(pub f64);
 /// Represents feedback system with discrete regulator and discrete controlled system.
 pub struct DiscreteFeedbackSystem {
     /// Regulator for the system
-    regulator: Box<dyn DiscreteRegulator + Send>,
+    regulator: Box<dyn Regulator + Send>,
     /// Controlled system
     system: Box<dyn DiscreteSystem + Send>,
 }
@@ -708,7 +708,7 @@ impl DiscretePIDRegulator {
     }
 }
 
-impl DiscreteRegulator for DiscretePIDRegulator {
+impl Regulator for DiscretePIDRegulator {
     fn compute_control(
         &mut self,
         y: &Tensor,
@@ -744,7 +744,7 @@ impl DiscreteRegulator for DiscretePIDRegulator {
 impl DiscreteFeedbackSystem {
     pub fn new(
         // FIXME: This is temporary fix, this should be changed when more regulators are added
-        regulator: Box<dyn DiscreteRegulator + Send>,
+        regulator: Box<dyn Regulator + Send>,
         system: Box<dyn DiscreteSystem + Send>,
     ) -> Self {
         Self { regulator, system }
@@ -777,7 +777,7 @@ pub enum ContinousFeedbackSystemError {
 /// Represents feedback system with discrete regulator and continuous controlled system.
 pub struct ContinousFeedbackSystem {
     /// Discrete-time regulator
-    regulator: Box<dyn DiscreteRegulator + Send>,
+    regulator: Box<dyn Regulator + Send>,
     /// Continous system being controlled
     system: ContinousFiniteLTISystem,
     /// Discrete time step for control updates
@@ -788,7 +788,7 @@ pub struct ContinousFeedbackSystem {
 
 impl ContinousFeedbackSystem {
     pub fn new(
-        regulator: Box<dyn DiscreteRegulator + Send>,
+        regulator: Box<dyn Regulator + Send>,
         system: ContinousFiniteLTISystem,
         time_step: f64,
     ) -> Result<Self, ContinousFeedbackSystemError> {
