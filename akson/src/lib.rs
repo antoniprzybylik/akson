@@ -1,4 +1,4 @@
-use tch::{IndexOp, Tensor};
+use tch::{IndexOp, Tensor, CModule};
 use thiserror::Error;
 use anyhow::anyhow;
 
@@ -805,43 +805,70 @@ impl ContinousFeedbackSystem {
     }
 
     pub fn step(&mut self, reference: &Tensor) -> Result<Tensor, anyhow::Error> {
-        // 1. Compute control input based on current output
+        // Compute control input using regulator
         let y = self.system.current_output();
         let u = self.regulator.compute_control(&y, reference)
             .map_err(|e| anyhow!("Regulator error: {}", e))?
-            .reshape(&[1, 1]);  // Ensure 1x1 shape
+            .reshape(&[1, 1]);
 
+        // Prepare system matrices and initial state
         let a = self.system.get_state_matrix_a();
-        let a_inv = a.inverse(); // Compute inverse once for efficiency
         let b = self.system.get_input_matrix_b();
         let c = self.system.get_output_matrix_c();
         let d = self.system.get_feedthrough_matrix_d();
-        let x0 = self.system.get_state_x().shallow_clone();
-        let bu = b.matmul(&u);
+        let x0 = self.system.get_state_x().squeeze(); // Convert to 1D tensor
+        let bu = b.matmul(&u).squeeze(); // Convert to 1D tensor
 
-        // 2. Generate samples during the time_step interval
-        let num_samples = 10; // Number of internal samples per step
-        let outputs = Tensor::zeros(&[1, num_samples + 1], (a.kind(), a.device()));
-        let eye = Tensor::eye(a.size()[0], (a.kind(), a.device()));
+        // Create sample inputs for tracing (time and state)
+        let t_sample = Tensor::from(0.0f64);
+        let x_sample = x0.shallow_clone();
 
-        for i in 0..=num_samples {
-            let tau = (i as f64 / num_samples as f64) * self.time_step;
-            let a_tau = a * tau;
-            let e_a_tau = a_tau.linalg_matrix_exp();
-            let adm1_tau = &e_a_tau - &eye;
-            let integral_term_tau = a_inv.matmul(&adm1_tau);
-            let x_tau = e_a_tau.matmul(&x0) + integral_term_tau.matmul(&bu);
-            let y_tau = c.matmul(&x_tau) + d.matmul(&u);
-            outputs.narrow(1, i as i64, 1).copy_(&y_tau);
+        // Create ODE function with captured A and bu
+        let a_clone = a.shallow_clone();
+        let bu_clone = bu.shallow_clone();
+        let mut closure = |inputs: &[Tensor]| {
+            let x = &inputs[1];
+
+            let x_col = x.unsqueeze(1);
+
+            let dx = a_clone.matmul(&x_col)
+                .squeeze()
+                + &bu_clone;
+
+            vec![dx]
+        };
+
+        // Create traced module using create_by_tracing
+        let ode_fn = CModule::create_by_tracing(
+            "ode_fn",
+            "forward",
+            &[t_sample, x_sample],
+            &mut closure,
+        )?;
+
+        // Configure RK4 solver parameters
+        let t_span = Tensor::from_slice(&[0.0, self.time_step]); // [start, end]
+        let step_size = Tensor::from(self.time_step / 10.0);
+
+        // Solve the ODE using RK4
+        let (_, x_trajectory) = mini_ode::solve_rk4(
+            ode_fn,
+            t_span,
+            x0.shallow_clone(), // Already 1D
+            step_size,
+        )?;
+
+        // Calculate outputs (convert back to 2D for matrix operations)
+        let mut outputs = Vec::new();
+        for i in 0..x_trajectory.size()[0] {
+            let x = x_trajectory.i(i).unsqueeze(1); // Convert to 2D [n, 1]
+            let y = c.matmul(&x) + d.matmul(&u);
+            outputs.push(y);
         }
+        let outputs = Tensor::stack(&outputs, 1);
 
-        // 3. Update system state to the end of the time_step
-        let a_dt = a * self.time_step;
-        let e_a_dt = a_dt.linalg_matrix_exp();
-        let adm1 = &e_a_dt - &eye;
-        let integral_term = a_inv.matmul(&adm1);
-        let x_next = e_a_dt.matmul(&x0) + integral_term.matmul(&bu);
-        self.system.set_state_x(x_next);
+        // Update system state (convert back to 2D)
+        self.system.set_state_x(x_trajectory.i(-1).unsqueeze(1));
         self.current_time += self.time_step;
 
         Ok(outputs)
