@@ -66,25 +66,18 @@ pub enum DiscretePIDRegulatorError {
 }
 
 /// A trait representing a discrete-time regulator.
-///
-/// Implementations should specify their required reference type using the [`DiscreteRegulator::Reference`] associated type.
 pub trait DiscreteRegulator: Send {
-    /// The type of reference required by this regulator.
-    ///
-    /// Different regulators accept different reference.
-    type Reference;
-
     ///
     /// # Arguments
     /// * y - Tensor containing past system outputs and current system output
-    /// * reference - Reference specific to the regulator type
+    /// * reference - Reference trajectory
     ///
     /// # Returns
     /// `Result<Tensor>` containing computed system input or an error
     fn compute_control(
         &mut self,
         y: &Tensor,
-        reference: &Self::Reference,
+        reference: &Tensor,
     ) -> Result<Tensor, Box<dyn std::error::Error>>;
 }
 
@@ -262,7 +255,7 @@ pub struct DiscretePIDReference(pub f64);
 /// Represents feedback system with discrete regulator and discrete controlled system.
 pub struct DiscreteFeedbackSystem {
     /// Regulator for the system
-    regulator: Box<dyn DiscreteRegulator<Reference=DiscretePIDReference> + Send>,
+    regulator: Box<dyn DiscreteRegulator + Send>,
     /// Controlled system
     system: Box<dyn DiscreteSystem + Send>,
 }
@@ -716,16 +709,15 @@ impl DiscretePIDRegulator {
 }
 
 impl DiscreteRegulator for DiscretePIDRegulator {
-    type Reference = DiscretePIDReference;
-
     fn compute_control(
         &mut self,
         y: &Tensor,
-        reference: &Self::Reference,
+        reference: &Tensor,
     ) -> Result<Tensor, Box<dyn std::error::Error>> {
-        // TODO: Check that all dimensions of y are 1
+        // TODO: Check that all dimensions of `y` are 1
+        // TODO: Check that all dimensions of `reference` are 1
 
-        let e = reference.0 - y;
+        let e = reference - y;
 
         let mut result = e.copy() * self.r_0;
         if let Some(ref e_km1) = self.e_km1 {
@@ -752,13 +744,13 @@ impl DiscreteRegulator for DiscretePIDRegulator {
 impl DiscreteFeedbackSystem {
     pub fn new(
         // FIXME: This is temporary fix, this should be changed when more regulators are added
-        regulator: Box<dyn DiscreteRegulator<Reference = DiscretePIDReference> + Send>,
+        regulator: Box<dyn DiscreteRegulator + Send>,
         system: Box<dyn DiscreteSystem + Send>,
     ) -> Self {
         Self { regulator, system }
     }
 
-    pub fn step(&mut self, reference: &DiscretePIDReference) -> Result<Tensor, anyhow::Error> {
+    pub fn step(&mut self, reference: &Tensor) -> Result<Tensor, anyhow::Error> {
         let y = self.system.current_output();
 
         let u = self.regulator.compute_control(&y, reference).map_err(
@@ -785,7 +777,7 @@ pub enum ContinousFeedbackSystemError {
 /// Represents feedback system with discrete regulator and continuous controlled system.
 pub struct ContinousFeedbackSystem {
     /// Discrete-time regulator
-    regulator: Box<dyn DiscreteRegulator<Reference = DiscretePIDReference> + Send>,
+    regulator: Box<dyn DiscreteRegulator + Send>,
     /// Continous system being controlled
     system: ContinousFiniteLTISystem,
     /// Discrete time step for control updates
@@ -796,7 +788,7 @@ pub struct ContinousFeedbackSystem {
 
 impl ContinousFeedbackSystem {
     pub fn new(
-        regulator: Box<dyn DiscreteRegulator<Reference = DiscretePIDReference> + Send>,
+        regulator: Box<dyn DiscreteRegulator + Send>,
         system: ContinousFiniteLTISystem,
         time_step: f64,
     ) -> Result<Self, ContinousFeedbackSystemError> {
@@ -812,7 +804,7 @@ impl ContinousFeedbackSystem {
         })
     }
 
-    pub fn step(&mut self, reference: &DiscretePIDReference) -> Result<Tensor, anyhow::Error> {
+    pub fn step(&mut self, reference: &Tensor) -> Result<Tensor, anyhow::Error> {
         // 1. Compute control input based on current output
         let y = self.system.current_output();
         let u = self.regulator.compute_control(&y, reference)

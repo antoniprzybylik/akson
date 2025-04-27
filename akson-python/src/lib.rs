@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use pyo3_tch::PyTensor;
+use tch::Tensor;
 use akson::ContinousFiniteLTISystem;
 use akson::DiscreteFiniteLTISystem;
 use akson::DiscretePIDRegulator;
@@ -117,7 +118,7 @@ impl PyDiscreteFeedbackSystem {
         regulator: &PyDiscretePIDRegulator,
         system: &PyDiscreteFiniteLTISystem,
     ) -> Self {
-        let rust_regulator = Box::new(regulator.0.clone()) as Box<dyn DiscreteRegulator<Reference = akson::DiscretePIDReference> + Send>;
+        let rust_regulator = Box::new(regulator.0.clone()) as Box<dyn DiscreteRegulator + Send>;
         let rust_system = Box::new(system.0.clone()) as Box<dyn DiscreteSystem + Send>;
         Self(DiscreteFeedbackSystem::new(
             rust_regulator,
@@ -126,7 +127,7 @@ impl PyDiscreteFeedbackSystem {
     }
 
     fn step(&mut self, reference: f64) -> PyResult<PyTensor> {
-        let result = self.0.step(&akson::DiscretePIDReference(reference)).unwrap();
+        let result = self.0.step(&Tensor::from(reference)).unwrap();
         Ok(PyTensor(result))
     }
 }
@@ -143,7 +144,7 @@ impl PyContinousFeedbackSystem {
         time_step: f64,
     ) -> PyResult<Self> {
         let rust_regulator = Box::new(regulator.0.clone())
-            as Box<dyn DiscreteRegulator<Reference = akson::DiscretePIDReference> + Send>;
+            as Box<dyn DiscreteRegulator + Send>;
 
         let rust_system = system.0.clone();
 
@@ -157,7 +158,7 @@ impl PyContinousFeedbackSystem {
     }
 
     fn step(&mut self, reference: f64) -> PyResult<PyTensor> {
-        let output = self.0.step(&akson::DiscretePIDReference(reference))
+        let output = self.0.step(&Tensor::from(reference))
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
         Ok(PyTensor(output))
     }
