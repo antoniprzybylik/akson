@@ -804,7 +804,7 @@ impl ContinousFeedbackSystem {
         })
     }
 
-    pub fn step(&mut self, reference: &Tensor) -> Result<(Tensor, Tensor), anyhow::Error> {
+    pub fn step(&mut self, reference: &Tensor, step_size: Option<Tensor>) -> Result<(Tensor, Tensor), anyhow::Error> {
         // Compute control input using regulator
         let y = self.system.current_output();
         let u = self.regulator.compute_control(&y, reference)
@@ -838,7 +838,7 @@ impl ContinousFeedbackSystem {
     
         // Configure RK4 solver
         let t_span = Tensor::from_slice(&[0.0, self.time_step]);
-        let step_size = Tensor::from(self.time_step / 10.0);
+        let step_size = step_size.unwrap_or(Tensor::from(self.time_step / 10.0));
     
         // Solve the ODE - now capturing both time and state trajectories
         let (t_points, x_trajectory) = mini_ode::solve_rk4(

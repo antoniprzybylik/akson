@@ -157,8 +157,8 @@ impl PyContinousFeedbackSystem {
         Ok(Self(feedback))
     }
 
-    fn step(&mut self, reference: f64) -> PyResult<(PyTensor, PyTensor)> {
-        let output = self.0.step(&Tensor::from(reference))
+    fn step(&mut self, reference: PyTensor, step_size: Option<PyTensor>) -> PyResult<(PyTensor, PyTensor)> {
+        let output = self.0.step(&reference.0, step_size.map(|t| t.0))
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
         Ok((PyTensor(output.0), PyTensor(output.1)))
     }
