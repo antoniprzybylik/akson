@@ -322,6 +322,14 @@ impl ContinousFiniteLTISystem {
         self.output_matrix_c.mm(&self.state_x)
     }
 
+    fn kind(&self) -> tch::Kind {
+        self.state_x.kind()
+    }
+
+    fn device(&self) -> tch::Device {
+        self.state_x.device()
+    }
+
     /// Construct the system from transfer function coefficients.
     pub fn from_tf(
         numerator: Tensor,
@@ -540,6 +548,94 @@ impl ContinousFiniteLTISystem {
 
     pub fn set_state_x(&mut self, new_state_x: Tensor) {
         self.state_x = new_state_x;
+    }
+
+    /// Computes the step response of the continuous-time system.
+    ///
+    /// # Arguments
+    /// * `duration` - The time duration over which to simulate the step response
+    /// * `step_size` - The step size for the ODE solver
+    ///
+    /// # Returns
+    /// `Result<(Tensor, Tensor)>` containing:
+    /// - Time points (1D tensor)
+    /// - Output values at corresponding time points (1D tensor)
+    pub fn step_response(
+        &self,
+        duration: f64,
+        step_size: f64,
+    ) -> Result<(Tensor, Tensor), Box<dyn std::error::Error>> {
+        // Validate input parameters
+        if duration <= 0.0 {
+            return Err(Box::new(ContinousFiniteLTISystemError::InvalidArgument {
+                explanation: format!("Duration must be positive, got {}", duration),
+            }));
+        }
+        if step_size <= 0.0 {
+            return Err(Box::new(ContinousFiniteLTISystemError::InvalidArgument {
+                explanation: format!("Step size must be positive, got {}", step_size),
+            }));
+        }
+
+        // Clone the system to preserve original state
+        let system_clone = self.clone();
+
+        // Step input u(t) = 1 for all t >= 0
+        let u = Tensor::ones([1, 1], (system_clone.kind(), system_clone.device()));
+
+        // Precompute B * u (constant for step input)
+        let bu = system_clone.input_matrix_b.matmul(&u).squeeze();
+
+        // State matrix A and initial state x0
+        let a = system_clone.state_matrix_a;
+        let x0 = system_clone.state_x.squeeze();
+
+        // Time span from 0 to duration
+        let t_span = Tensor::from_slice(&[0.0, duration]);
+
+        // Define the ODE function: dx/dt = A*x + B*u
+        let a_clone = a.shallow_clone();
+        let bu_clone = bu.shallow_clone();
+        let mut closure = |inputs: &[Tensor]| {
+            let _t = &inputs[0];  // Time is unused in LTI systems
+            let x = &inputs[1];
+            let dx = a_clone.matmul(&x.unsqueeze(1)).squeeze() + &bu_clone;
+            vec![dx]
+        };
+
+        // Create traced module for ODE function
+        let ode_fn = CModule::create_by_tracing(
+            "ode_fn_step_response",
+            "forward",
+            &[Tensor::from(0.0), x0.shallow_clone()],
+            &mut closure,
+        )?;
+
+        // Solve the ODE using RK4
+        let (t_points, x_trajectory) = mini_ode::solve_rk4(
+            ode_fn,
+            t_span,
+            x0,
+            Tensor::from(step_size),
+        )?;
+
+        // Compute outputs at each time point
+        let c = system_clone.output_matrix_c;
+        let d = system_clone.feedthrough_matrix_d;
+        let mut outputs = Vec::new();
+
+        for i in 0..x_trajectory.size()[0] {
+            let x_i = x_trajectory.i(i).unsqueeze(1);  // [state_size, 1]
+            let y_i = c.matmul(&x_i) + d.matmul(&u);
+            outputs.push(y_i.squeeze());  // Convert [1, 1] to scalar
+        }
+
+        // Convert outputs to tensor and transpose to match time points
+        let outputs_tensor = Tensor::stack(&outputs, 0)
+            .to_kind(t_points.kind())
+            .squeeze();
+
+        Ok((t_points, outputs_tensor))
     }
 }
 

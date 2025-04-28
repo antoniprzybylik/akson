@@ -54,6 +54,12 @@ impl PyContinousFiniteLTISystem {
     fn discretize(&self, _py: Python<'_>, t: f64) -> PyResult<PyDiscreteFiniteLTISystem> {
         Ok(PyDiscreteFiniteLTISystem(self.0.discretize(t)))
     }
+
+    fn step_response(&self, duration: f64, step_size: f64) -> PyResult<(PyTensor, PyTensor)> {
+        self.0.step_response(duration, step_size)
+            .map(|(t, y)| (PyTensor(t), PyTensor(y)))
+            .map_err(|err| pyo3::exceptions::PyRuntimeError::new_err(err.to_string()))
+    }
 }
 
 #[pyclass(dict, module = "rust", name = "DiscreteFiniteLTISystem")]
