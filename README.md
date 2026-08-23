@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/logo.png" alt="Logo of the Akson software package" width="60%">
+  <img src="./assets/logo.png" alt="Logo of the Akson software package" width="50%">
 </div>
 
 # Akson
@@ -8,13 +8,21 @@ A software package for efficient design of control systems.
 
 ## 📦 Building the package
 
-This project uses [Poetry](https://python-poetry.org/). To build the source distribution and wheel run:
+This project uses [Poetry](https://python-poetry.org/) for packaging and dependency management. To build the source distribution and wheel run:
 
 ```bash
 poetry build
 ```
 
 The resulting packages will be placed in `dist/`.
+
+## 📋 Running tests
+
+After installing the package, run tests with:
+
+```
+pytest
+```
 
 ## 📄 License
 
