@@ -1,0 +1,3 @@
+dist/
+src/akson/__pycache__/
+tests/__pycache__/
