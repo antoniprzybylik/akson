@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
   <img src="./assets/logo.png" alt="Logo of the Akson software package" width="60%">
 </div>
 
