@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "akson"
+version = "0.1.0"
+description = "Software package for efficient design of control systems"
+authors = ["Antoni Michał Przybylik <antoni@taon.io>"]
+license = "Unlicense"
+readme = "README.md"
+packages = [{include = "akson", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.14,<3.15"
+torch = "=2.11.0"
+mini-ode = "=0.1.6"
+sympy = "^1.14.0"
+numpy = "^2.5.0"
+cvxpy = "^1.9.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^9.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
