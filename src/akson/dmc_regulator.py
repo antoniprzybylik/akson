@@ -503,3 +503,10 @@ class DMCRegulatorClosedSystem:
         self.plant.simulation_time = current_t
     
         return torch.tensor(t_all, dtype=self.dtype, device=self.device), torch.stack(y_all), torch.stack(u_all)
+
+    def reset(
+        self
+    ) -> None:
+        """Reset the plant state and the regulator state. """
+        self.plant.reset()
+        self.state = DMCRegulatorState.initial_state_for(self.config)
