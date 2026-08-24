@@ -6,6 +6,15 @@
 
 A software package for efficient design of control systems.
 
+## 📂 Usage examples
+
+The following examples can be found in the [`examples/`](./examples/) directory:
+
+- **SISO Plant Step Response** – A brief introduction to the package, computing the step response of a system built from LTI state-space matrices.
+- **DC Engine Simulation** – Simulates the Maxon RE 40 motor, reproducing its catalogue steady-state speed and response dynamics.
+- **SISO Plant and PID Regulator** – Constructs and simulates a closed-loop system comprising a SISO plant and a PID regulator.
+- **SISO Plant and DMC Regulator** – Constructs and simulates a closed-loop system comprising a SISO plant and a DMC regulator.
+
 ## 📦 Building the package
 
 This project uses [Poetry](https://python-poetry.org/) for packaging and dependency management. To build the source distribution and wheel run:
