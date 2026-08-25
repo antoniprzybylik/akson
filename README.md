@@ -26,7 +26,7 @@ poetry build
 
 The resulting packages will be placed in `dist/`.
 
-## 📋 Running tests
+## 📋 Running the tests
 
 After installing the package, run tests with:
 
