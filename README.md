@@ -14,6 +14,7 @@ The following examples can be found in the [`examples/`](./examples/) directory:
 - **DC Engine Simulation** – Simulates the Maxon RE 40 motor, reproducing its catalogue steady-state speed and response dynamics.
 - **SISO Plant and PID Regulator** – Constructs and simulates a closed-loop system comprising a SISO plant and a PID regulator.
 - **SISO Plant and DMC Regulator** – Constructs and simulates a closed-loop system comprising a SISO plant and a DMC regulator.
+- **Wood-Berry Column Control** - Demonstrates control of Wood-Berry column with many types of regulators (DMC, QDMC, PID). The Wood-Berry column is a canonical benchmark for linear MIMO systems.
 
 ## 📦 Building the package
 
