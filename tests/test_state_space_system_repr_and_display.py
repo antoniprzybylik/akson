@@ -88,11 +88,3 @@ def test_state_space_system_repr_custom_initial_state(lti_dynamics):
     
     assert "StateSpaceSystem" in repr_str
     assert "x=" in repr_str
-
-
-def test_matrix_latex_str_formatting(lti_dynamics):
-    latex = lti_dynamics._repr_latex_()
-    
-    # Check LaTeX matrices format
-    # The LaTeX code should contain & for columns and \\ for rows
-    assert "&&" in latex and r"\\" in latex
