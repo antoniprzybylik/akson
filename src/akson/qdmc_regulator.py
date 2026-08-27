@@ -118,7 +118,7 @@ class QDMCRegulatorConfiguration:
 
         # Validate operating point tensor shapes
         validate_tensor(operating_point.u, "operating point input", (self.n_inputs,))
-        validate_tensor(operating_point.y, "operating point output", (self.n_inputs,))
+        validate_tensor(operating_point.y, "operating point output", (self.n_outputs,))
         self.operating_point = OperatingPoint(
             u=operating_point.u,
             x=operating_point.x,
