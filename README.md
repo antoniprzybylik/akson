@@ -4,7 +4,7 @@
 
 # Akson
 
-A software package for efficient design of control systems.
+Akson is a Python software package for the efficient design of control systems. It supports the simulation of closed-loop systems comprising a plant and a controller, and also provides tools for exporting designed PID controllers directly as IEC 61131-3 Structured Text for deployment on programmable logic controllers.
 
 ## 📂 Usage examples
 
