@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import warnings
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 from .state_space_system import StateSpaceSystem, StateSpaceDynamics
@@ -79,6 +80,8 @@ class PIDRegulatorConfiguration:
                 raise ValueError(f"Channel {io_pair} defined twice.")
             io_pairs.add(io_pair)
 
+        self.channels = list(channels)
+
         self.dtype = dtype
         self.device = device
 
@@ -115,6 +118,103 @@ class PIDRegulatorConfiguration:
             self.coeffs[channel.input_idx, channel.output_idx, 2] = r2
 
         self.t = t
+
+    def export_plc_code(
+        self,
+        setpoint_registers,
+        regulator_input_registers,
+        regulator_output_registers,
+    ) -> str:
+        """! Generates IEC 61131-3 Structured Text code implementing this PID regulator on a PLC.
+
+        @param setpoint_registers Dictionary of the format {output_idx: register_name}.
+        @param regulator_input_registers Dictionary of the format {output_idx: register_name}.
+        @param regulator_output_registers Dictionary of the format {input_idx: register_name}.
+
+        @return st_code Generated IEC 61131-3 Structured Text code
+        """
+        if len(self.channels) == 0:
+            raise ValueError("Cannot export PLC code for a regulator with no channels")
+
+        # Validate arguments
+        def _validate_dict(value, valid_indices, arg_name):
+            missing = [i for i in valid_indices if i not in value]
+            if missing:
+                raise ValueError(f"{arg_name} is missing entries for indices {missing}")
+        output_indices = sorted({channel.output_idx for channel in self.channels})
+        input_indices = sorted({channel.input_idx for channel in self.channels})
+        _validate_dict(setpoint_registers, output_indices, "setpoint_registers")
+        _validate_dict(regulator_input_registers, output_indices, "regulator_input_registers")
+        _validate_dict(regulator_output_registers, input_indices, "regulator_output_registers")
+
+        # Resolve timer name and period literal
+        period_ms = self.t * 1000.0
+        period_ms_rounded = round(period_ms)
+        if period_ms_rounded == 0.:
+            raise ValueError("Rounded timer period is 0ms!")
+        if abs(period_ms - period_ms_rounded) > 1e-6:
+            warnings.warn(
+                f"Discretization period {self.t}s is not a whole number of "
+                f"milliseconds; rounding to {period_ms_rounded}ms for the PLC timer.",
+                RuntimeWarning,
+            )
+        timer_name = f"T{period_ms_rounded}ms"
+        time_literal = f"T#{period_ms_rounded}ms"
+
+        def _fmt_term(coeff: float) -> str:
+            text = f"{coeff:.10f}".rstrip("0").rstrip(".")
+            if text in ("", "-"):
+                text = "0.0"
+            if "." not in text:
+                text += ".0"
+            return f"({text})" if coeff < 0 else text
+
+        lines = []
+        lines.append(f"{timer_name}(IN := TRUE, PT := {time_literal});")
+        lines.append(f"IF {timer_name}.Q THEN")
+
+        # Error history update, one block per channel
+        for channel in self.channels:
+            suffix = f"_i{channel.input_idx}_o{channel.output_idx}"
+            curr_e = f"curr_e{suffix}"
+            prev_e = f"prev_e{suffix}"
+            prev_prev_e = f"prev_prev_e{suffix}"
+            sp_reg = setpoint_registers[channel.output_idx]
+            meas_reg = regulator_input_registers[channel.output_idx]
+
+            lines.append(f"    {prev_prev_e} := {prev_e};")
+            lines.append(f"    {prev_e} := {curr_e};")
+            lines.append(f"    {curr_e} := {sp_reg} - {meas_reg};")
+
+        # Control signal update: Summing all channels that feed that input.
+        # Like `coeffs[:, :, k] @ e_k` in `step`
+        for input_idx in input_indices:
+            out_reg = regulator_output_registers[input_idx]
+            prev_u = f"prev_u_i{input_idx}"
+
+            terms = []
+            for channel in self.channels:
+                if channel.input_idx != input_idx:
+                    continue
+                suffix = f"_i{channel.input_idx}_o{channel.output_idx}"
+                curr_e = f"curr_e{suffix}"
+                prev_e = f"prev_e{suffix}"
+                prev_prev_e = f"prev_prev_e{suffix}"
+                r0 = self.coeffs[channel.input_idx, channel.output_idx, 0].item()
+                r1 = self.coeffs[channel.input_idx, channel.output_idx, 1].item()
+                r2 = self.coeffs[channel.input_idx, channel.output_idx, 2].item()
+                terms.append(f"DINT_TO_REAL({curr_e})*{_fmt_term(r0)}")
+                terms.append(f"DINT_TO_REAL({prev_e})*{_fmt_term(r1)}")
+                terms.append(f"DINT_TO_REAL({prev_prev_e})*{_fmt_term(r2)}")
+
+            lines.append(f"    {prev_u} := {out_reg};")
+            expr = " + ".join(terms) + f" + DINT_TO_REAL({prev_u})"
+            lines.append(f"    {out_reg} := REAL_TO_DINT({expr});")
+
+        lines.append(f"    {timer_name}(IN := FALSE);")
+        lines.append("END_IF;")
+
+        return "\n".join(lines)
 
 
 class PIDRegulatorState:
