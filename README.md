@@ -12,9 +12,10 @@ The following examples can be found in the [`examples/`](./examples/) directory:
 
 - **SISO Plant Step Response** – A brief introduction to the package, computing the step response of a system built from LTI state-space matrices.
 - **DC Engine Simulation** – Simulates the Maxon RE 40 motor, reproducing its catalogue steady-state speed and response dynamics.
-- **SISO Plant and PID Regulator** – Constructs and simulates a closed-loop system comprising a SISO plant and a PID regulator.
-- **SISO Plant and DMC Regulator** – Constructs and simulates a closed-loop system comprising a SISO plant and a DMC regulator.
-- **Wood-Berry Column Control** - Demonstrates control of Wood-Berry column with many types of regulators (DMC, QDMC, PID). The Wood-Berry column is a canonical benchmark for linear MIMO systems.
+- **SISO Plant and PID Controller** – Constructs and simulates a closed-loop system comprising a SISO plant and a PID controller.
+- **SISO Plant and DMC Controller** – Constructs and simulates a closed-loop system comprising a SISO plant and a DMC controller.
+- **Wood-Berry Column Control** - Demonstrates control of Wood-Berry column with many types of controllers (DMC, QDMC, PID). The Wood-Berry column is a canonical benchmark for linear MIMO systems.
+- **Exporting PID Controller PLC Code** - Demonstrates eexporting of PLC code for PID controller.
 
 ## 📦 Building the package
 
