@@ -66,13 +66,17 @@ def test_pid_config_rejects_duplicate_channel():
     channel1 = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
     channel2 = PIDChannel(output_idx=0, input_idx=0, K=2.0, Ti=2.0, Td=0.0)
     with pytest.raises(ValueError, match="defined twice"):
-        PIDControllerConfiguration(n_inputs=1, n_outputs=1, channels=[channel1, channel2], t=0.1)
+        PIDControllerConfiguration(
+            n_inputs=1, n_outputs=1, channels=[channel1, channel2], t=0.1
+        )
 
 
 def test_pid_config_accepts_multiple_distinct_channels():
     channel1 = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
     channel2 = PIDChannel(output_idx=1, input_idx=1, K=-1.0, Ti=2.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=2, n_outputs=2, channels=[channel1, channel2], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=2, n_outputs=2, channels=[channel1, channel2], t=0.1
+    )
     assert config.n_inputs == 2
     assert config.n_outputs == 2
 
@@ -81,8 +85,12 @@ def test_pid_config_rejects_u_min_greater_than_u_max():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
     with pytest.raises(ValueError):
         PIDControllerConfiguration(
-            n_inputs=1, n_outputs=1, channels=[channel], t=0.1,
-            u_min=torch.tensor([5.0]), u_max=torch.tensor([1.0]),
+            n_inputs=1,
+            n_outputs=1,
+            channels=[channel],
+            t=0.1,
+            u_min=torch.tensor([5.0]),
+            u_max=torch.tensor([1.0]),
         )
 
 
@@ -90,22 +98,30 @@ def test_pid_config_rejects_u0_outside_bounds():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
     with pytest.raises(ValueError):
         PIDControllerConfiguration(
-            n_inputs=1, n_outputs=1, channels=[channel], t=0.1,
+            n_inputs=1,
+            n_outputs=1,
+            channels=[channel],
+            t=0.1,
             u0=torch.tensor([10.0]),
-            u_min=torch.tensor([0.0]), u_max=torch.tensor([5.0]),
+            u_min=torch.tensor([0.0]),
+            u_max=torch.tensor([5.0]),
         )
 
 
 def test_pid_config_default_u0_is_none():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=1, n_outputs=1, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=1, n_outputs=1, channels=[channel], t=0.1
+    )
     assert config.u0 is None
 
 
 def test_pid_config_coefficients_formula():
     K, Ti, Td, t = 2.0, 5.0, 0.1, 0.5
     channel = PIDChannel(output_idx=0, input_idx=0, K=K, Ti=Ti, Td=Td)
-    config = PIDControllerConfiguration(n_inputs=1, n_outputs=1, channels=[channel], t=t)
+    config = PIDControllerConfiguration(
+        n_inputs=1, n_outputs=1, channels=[channel], t=t
+    )
 
     expected_r0 = K * (1.0 + t / (2.0 * Ti) + Td / t)
     expected_r1 = K * (t / (2.0 * Ti) - 2.0 * Td / t - 1.0)
@@ -118,7 +134,9 @@ def test_pid_config_coefficients_formula():
 
 def test_pid_config_coefficients_are_zero_for_unused_channel_pairs():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=2, n_outputs=2, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=2, n_outputs=2, channels=[channel], t=0.1
+    )
     # input_idx=1 / output_idx=1 was never configured, so its coefficients stay zero
     assert torch.allclose(config.coeffs[1, 1], torch.zeros(3, dtype=config.dtype))
     assert torch.allclose(config.coeffs[0, 1], torch.zeros(3, dtype=config.dtype))
@@ -133,7 +151,9 @@ def test_pid_state_defaults_are_zero():
 
 def test_pid_state_initial_state_for_matches_configuration():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=2, n_outputs=3, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=2, n_outputs=3, channels=[channel], t=0.1
+    )
     state = PIDControllerState.initial_state_for(config)
     assert state.e_prev.shape == (3,)
     assert state.u_prev.shape == (2,)
@@ -182,9 +202,13 @@ def test_pid_step_updates_error_history():
 def test_pid_step_clamps_to_u_max_relative_to_u0():
     channel = PIDChannel(output_idx=0, input_idx=0, K=100.0, Ti=1.0, Td=0.0)
     config = PIDControllerConfiguration(
-        n_inputs=1, n_outputs=1, channels=[channel], t=1.0,
+        n_inputs=1,
+        n_outputs=1,
+        channels=[channel],
+        t=1.0,
         u0=torch.tensor([0.0]),
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
     )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
@@ -202,9 +226,13 @@ def test_pid_step_clamps_to_u_max_relative_to_u0():
 def test_pid_step_clamps_to_u_min_relative_to_u0():
     channel = PIDChannel(output_idx=0, input_idx=0, K=100.0, Ti=1.0, Td=0.0)
     config = PIDControllerConfiguration(
-        n_inputs=1, n_outputs=1, channels=[channel], t=1.0,
+        n_inputs=1,
+        n_outputs=1,
+        channels=[channel],
+        t=1.0,
         u0=torch.tensor([0.0]),
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
     )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
@@ -221,7 +249,9 @@ def test_pid_step_clamps_to_u_min_relative_to_u0():
 
 def test_pid_step_rejects_wrong_y_shape():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=1, n_outputs=1, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=1, n_outputs=1, channels=[channel], t=0.1
+    )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
     closed_system = PIDControllerClosedSystem(
@@ -236,7 +266,9 @@ def test_pid_step_rejects_wrong_y_shape():
 
 def test_pid_step_rejects_wrong_setpoint_shape():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=1, n_outputs=1, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=1, n_outputs=1, channels=[channel], t=0.1
+    )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
     closed_system = PIDControllerClosedSystem(
@@ -251,7 +283,9 @@ def test_pid_step_rejects_wrong_setpoint_shape():
 
 def test_pid_closed_system_rejects_mismatched_n_inputs():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=2, n_outputs=1, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=2, n_outputs=1, channels=[channel], t=0.1
+    )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()  # n_inputs=1
     with pytest.raises(ValueError, match="Different assumed number of system inputs"):
@@ -262,7 +296,9 @@ def test_pid_closed_system_rejects_mismatched_n_inputs():
 
 def test_pid_closed_system_rejects_mismatched_n_outputs():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=1, n_outputs=2, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=1, n_outputs=2, channels=[channel], t=0.1
+    )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()  # n_outputs=1
     with pytest.raises(ValueError, match="Different assumed number of system outputs"):
@@ -273,7 +309,9 @@ def test_pid_closed_system_rejects_mismatched_n_outputs():
 
 def test_pid_simulate_rejects_num_substeps_below_one():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=1, n_outputs=1, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=1, n_outputs=1, channels=[channel], t=0.1
+    )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
     closed_system = PIDControllerClosedSystem(
@@ -286,13 +324,17 @@ def test_pid_simulate_rejects_num_substeps_below_one():
 
 def test_pid_simulate_rejects_wrong_setpoints_shape():
     channel = PIDChannel(output_idx=0, input_idx=0, K=1.0, Ti=1.0, Td=0.0)
-    config = PIDControllerConfiguration(n_inputs=1, n_outputs=1, channels=[channel], t=0.1)
+    config = PIDControllerConfiguration(
+        n_inputs=1, n_outputs=1, channels=[channel], t=0.1
+    )
     state = PIDControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
     closed_system = PIDControllerClosedSystem(
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
-    bad_setpoints = torch.tensor([[1.0, 2.0]] * 5, dtype=torch.float64)  # wrong n_outputs
+    bad_setpoints = torch.tensor(
+        [[1.0, 2.0]] * 5, dtype=torch.float64
+    )  # wrong n_outputs
     with pytest.raises(ValueError):
         closed_system.simulate(bad_setpoints, duration=1.0, num_substeps=2)
 
@@ -309,7 +351,9 @@ def test_pid_simulate_returns_consistent_shapes():
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[1.0]] * 10, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(setpoints, duration=1.0, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        setpoints, duration=1.0, num_substeps=2
+    )
 
     assert t_all.shape[0] == y_all.shape[0]
     assert y_all.shape[1] == 1
@@ -331,5 +375,7 @@ def test_pid_simulate_pads_short_setpoints_with_last_value():
     )
     # Only 2 setpoints given, but 10 steps needed -> should be padded, not raise
     setpoints = torch.tensor([[1.0], [2.0]], dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(setpoints, duration=1.0, num_substeps=1)
+    t_all, y_all, u_all = closed_system.simulate(
+        setpoints, duration=1.0, num_substeps=1
+    )
     assert t_all.shape[0] > 0

@@ -49,7 +49,9 @@ def test_dmc_converges_to_constant_setpoint_siso():
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[2.0]] * 60, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=30.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=30.0, dt=0.5, num_substeps=2
+    )
 
     assert y_all[-1, 0].item() == pytest.approx(2.0, abs=0.1)
 
@@ -59,7 +61,9 @@ def test_dmc_tracks_setpoint_change():
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1.0]] * 30 + [[3.0]] * 30, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=30.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=30.0, dt=0.5, num_substeps=2
+    )
 
     assert y_all[-1, 0].item() > 2.0
 
@@ -69,7 +73,9 @@ def test_dmc_mimo_tracks_both_channels():
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1.5, -0.5]] * 60, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=30.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=30.0, dt=0.5, num_substeps=2
+    )
 
     assert y_all[-1, 0].item() == pytest.approx(1.5, abs=0.15)
     assert y_all[-1, 1].item() == pytest.approx(-0.5, abs=0.15)
@@ -78,12 +84,15 @@ def test_dmc_mimo_tracks_both_channels():
 def test_dmc_respects_u_bounds_throughout_simulation():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
     )
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1000.0]] * 40, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=20.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=20.0, dt=0.5, num_substeps=2
+    )
 
     assert (u_all[:, 0] <= 1.0 + 1e-6).all()
     assert (u_all[:, 0] >= -1.0 - 1e-6).all()
@@ -92,12 +101,15 @@ def test_dmc_respects_u_bounds_throughout_simulation():
 def test_dmc_respects_du_bounds_throughout_simulation():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        du_min=torch.tensor([-0.02]), du_max=torch.tensor([0.02]),
+        du_min=torch.tensor([-0.02]),
+        du_max=torch.tensor([0.02]),
     )
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1000.0]] * 40, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=20.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=20.0, dt=0.5, num_substeps=2
+    )
 
     du = u_all[1:, 0] - u_all[:-1, 0]
     assert (du <= 0.02 + 1e-9).all()
@@ -107,14 +119,18 @@ def test_dmc_respects_du_bounds_throughout_simulation():
 def test_dmc_with_polishing_still_respects_constraints():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        du_min=torch.tensor([-0.05]), du_max=torch.tensor([0.05]),
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        du_min=torch.tensor([-0.05]),
+        du_max=torch.tensor([0.05]),
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
         use_polishing=True,
     )
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1000.0]] * 40, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=20.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=20.0, dt=0.5, num_substeps=2
+    )
 
     assert (u_all[:, 0] <= 1.0 + 1e-6).all()
 
@@ -150,7 +166,9 @@ def test_dmc_simulate_extends_short_r_traj_with_last_value():
 
     # Provide far fewer reference points than num_steps + N requires
     r_traj = torch.tensor([[1.0], [2.0]], dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=10.0, dt=0.5, num_substeps=1)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=10.0, dt=0.5, num_substeps=1
+    )
 
     assert t_all.shape[0] > 0
     assert y_all.shape[0] == t_all.shape[0]

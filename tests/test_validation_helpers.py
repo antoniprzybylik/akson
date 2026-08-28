@@ -99,7 +99,11 @@ def test_validate_and_move_optional_tensor_raises_on_wrong_shape():
     t = torch.zeros(4, dtype=torch.float64)
     with pytest.raises(ValueError, match="x has bad shape"):
         validate_and_move_optional_tensor(
-            t, "x", (3,), desired_dtype=torch.float64, desired_device=torch.device("cpu")
+            t,
+            "x",
+            (3,),
+            desired_dtype=torch.float64,
+            desired_device=torch.device("cpu"),
         )
 
 
@@ -107,7 +111,11 @@ def test_validate_and_move_optional_tensor_error_message_contains_name():
     t = torch.zeros(4, dtype=torch.float64)
     with pytest.raises(ValueError, match="x has bad shape"):
         validate_and_move_optional_tensor(
-            t, "x", (3,), desired_dtype=torch.float64, desired_device=torch.device("cpu")
+            t,
+            "x",
+            (3,),
+            desired_dtype=torch.float64,
+            desired_device=torch.device("cpu"),
         )
 
 

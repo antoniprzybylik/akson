@@ -36,7 +36,9 @@ def _basic_config(N=3, Nu=2, D=5, **kwargs):
 def test_dmc_config_rejects_bad_step_response_ndim():
     S = torch.zeros(5, 1)  # should be 3D
     op = OperatingPoint(
-        torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64)
+        torch.zeros(1, dtype=torch.float64),
+        torch.zeros(1, dtype=torch.float64),
+        torch.zeros(1, dtype=torch.float64),
     )
     with pytest.raises(ValueError):
         DMCControllerConfiguration(S, N=3, Nu=2, operating_point=op)
@@ -45,7 +47,9 @@ def test_dmc_config_rejects_bad_step_response_ndim():
 def test_dmc_config_rejects_empty_step_response():
     S = torch.zeros(0, 1, 1, dtype=torch.float64)
     op = OperatingPoint(
-        torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64)
+        torch.zeros(1, dtype=torch.float64),
+        torch.zeros(1, dtype=torch.float64),
+        torch.zeros(1, dtype=torch.float64),
     )
     with pytest.raises(ValueError, match="must not contain less than one sample"):
         DMCControllerConfiguration(S, N=3, Nu=2, operating_point=op)
@@ -119,7 +123,9 @@ def test_dmc_state_initial_state_for_matches_config():
 
 def test_dmc_closed_system_rejects_state_horizon_mismatch():
     config = _basic_config(N=3, Nu=2, D=7)
-    bad_state = DMCControllerState.zero_state(dynamics_horizon=3, n_inputs=1)  # wrong horizon
+    bad_state = DMCControllerState.zero_state(
+        dynamics_horizon=3, n_inputs=1
+    )  # wrong horizon
     dynamics = _stable_siso_dynamics()
     with pytest.raises(ValueError, match="dynamics horizon"):
         DMCControllerClosedSystem(dynamics, config, bad_state)
@@ -127,7 +133,9 @@ def test_dmc_closed_system_rejects_state_horizon_mismatch():
 
 def test_dmc_closed_system_rejects_state_input_count_mismatch():
     config = _basic_config(N=3, Nu=2, D=7)
-    bad_state = DMCControllerState.zero_state(dynamics_horizon=7, n_inputs=3)  # wrong n_inputs
+    bad_state = DMCControllerState.zero_state(
+        dynamics_horizon=7, n_inputs=3
+    )  # wrong n_inputs
     dynamics = _stable_siso_dynamics()
     with pytest.raises(ValueError, match="Different assumed number of system inputs"):
         DMCControllerClosedSystem(dynamics, config, bad_state)
@@ -150,16 +158,22 @@ def test_dmc_closed_system_rejects_plant_input_mismatch():
 def test_dmc_closed_system_warns_when_controller_u_min_looser_than_plant():
     S = _siso_step_response(5)
     op = OperatingPoint(
-        torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64)
+        torch.zeros(1, dtype=torch.float64),
+        torch.zeros(1, dtype=torch.float64),
+        torch.zeros(1, dtype=torch.float64),
     )
-    config = DMCControllerConfiguration(S, N=3, Nu=2, operating_point=op)  # no u_min at all
+    config = DMCControllerConfiguration(
+        S, N=3, Nu=2, operating_point=op
+    )  # no u_min at all
     state = DMCControllerState.initial_state_for(config)
 
     A = torch.tensor([[-1.0]], dtype=torch.float64)
     B = torch.tensor([[1.0]], dtype=torch.float64)
     C = torch.tensor([[1.0]], dtype=torch.float64)
     D = torch.tensor([[0.0]], dtype=torch.float64)
-    dynamics = StateSpaceDynamics.from_linear(A, B, C, D, u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]))
+    dynamics = StateSpaceDynamics.from_linear(
+        A, B, C, D, u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0])
+    )
 
     with pytest.warns(RuntimeWarning, match="u_min are looser"):
         DMCControllerClosedSystem(dynamics, config, state)
@@ -193,13 +207,17 @@ def test_dmc_step_unconstrained_matches_K_times_error():
 
 
 def test_dmc_step_clamps_du_to_du_max():
-    config = _basic_config(N=3, Nu=2, D=5, du_min=torch.tensor([-0.05]), du_max=torch.tensor([0.05]))
+    config = _basic_config(
+        N=3, Nu=2, D=5, du_min=torch.tensor([-0.05]), du_max=torch.tensor([0.05])
+    )
     state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
-    r_traj = torch.tensor([[100.0], [100.0], [100.0]], dtype=torch.float64)  # huge setpoint jump
+    r_traj = torch.tensor(
+        [[100.0], [100.0], [100.0]], dtype=torch.float64
+    )  # huge setpoint jump
 
     u_new = closed_system.step(y, r_traj)
     assert u_new.item() <= 0.05 + 1e-9
@@ -207,8 +225,11 @@ def test_dmc_step_clamps_du_to_du_max():
 
 def test_dmc_step_clamps_u_to_u_max():
     config = _basic_config(
-        N=3, Nu=2, D=5,
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        N=3,
+        Nu=2,
+        D=5,
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
     )
     state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
@@ -253,16 +274,22 @@ def test_dmc_step_rejects_wrong_r_traj_shape():
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
-    bad_r_traj = torch.tensor([[0.5], [0.5]], dtype=torch.float64)  # should have length N=3
+    bad_r_traj = torch.tensor(
+        [[0.5], [0.5]], dtype=torch.float64
+    )  # should have length N=3
     with pytest.raises(ValueError):
         closed_system.step(y, bad_r_traj)
 
 
 def test_dmc_step_with_polishing_respects_constraints():
     config = _basic_config(
-        N=3, Nu=2, D=5,
-        du_min=torch.tensor([-0.05]), du_max=torch.tensor([0.05]),
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        N=3,
+        Nu=2,
+        D=5,
+        du_min=torch.tensor([-0.05]),
+        du_max=torch.tensor([0.05]),
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
         use_polishing=True,
     )
     state = DMCControllerState.initial_state_for(config)
@@ -305,7 +332,9 @@ def test_dmc_simulate_returns_consistent_shapes():
     closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1.0]] * 10, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=5.0, dt=1.0, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=5.0, dt=1.0, num_substeps=2
+    )
 
     assert t_all.shape[0] == y_all.shape[0]
     assert y_all.shape[1] == 1

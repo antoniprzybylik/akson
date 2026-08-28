@@ -3,6 +3,7 @@ import warnings
 import math
 from typing import Optional, Tuple
 
+
 def _round_to_nice(value: float) -> float:
     """Snap a step size down to a human-friendly value.
 
@@ -21,6 +22,7 @@ def _round_to_nice(value: float) -> float:
             return candidate * (10.0**exponent)
 
     return 1.0 * (10.0**exponent)
+
 
 def resolve_default_solver(
     duration: float,

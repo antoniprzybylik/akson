@@ -156,6 +156,8 @@ def test_base_dmc_state_rejects_mismatched_dimensions():
 def test_base_dmc_state_casts_dtype_and_device():
     past_du = torch.zeros(2, 2, dtype=torch.float32)
     current_u = torch.zeros(2, dtype=torch.float32)
-    state = BaseDMCState(past_du, current_u, dtype=torch.float64, device=torch.device("cpu"))
+    state = BaseDMCState(
+        past_du, current_u, dtype=torch.float64, device=torch.device("cpu")
+    )
     assert state.past_du.dtype == torch.float64
     assert state.current_u.dtype == torch.float64

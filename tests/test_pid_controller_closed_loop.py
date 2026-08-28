@@ -31,7 +31,10 @@ def _decoupled_mimo_dynamics(**kwargs):
 def _make_siso_pid(K=2.0, Ti=1.0, Td=0.0, t=0.1, **config_kwargs):
     channel = PIDChannel(output_idx=0, input_idx=0, K=K, Ti=Ti, Td=Td)
     config = PIDControllerConfiguration(
-        n_inputs=1, n_outputs=1, channels=[channel], t=t,
+        n_inputs=1,
+        n_outputs=1,
+        channels=[channel],
+        t=t,
         u0=torch.tensor([0.0], dtype=torch.float64),
         **config_kwargs,
     )
@@ -46,7 +49,9 @@ def test_pid_converges_to_constant_setpoint_siso():
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[2.0]] * 200, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(setpoints, duration=20.0, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        setpoints, duration=20.0, num_substeps=2
+    )
 
     assert y_all[-1, 0].item() == pytest.approx(2.0, abs=0.05)
 
@@ -58,7 +63,9 @@ def test_pid_tracks_setpoint_change():
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[1.0]] * 100 + [[3.0]] * 100, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(setpoints, duration=20.0, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        setpoints, duration=20.0, num_substeps=2
+    )
 
     # By the end of the run the output should have moved towards the second
     # setpoint (3.0) rather than stayed near the first (1.0)
@@ -69,7 +76,10 @@ def test_pid_mimo_channels_track_independently():
     channel0 = PIDChannel(output_idx=0, input_idx=0, K=2.0, Ti=1.0, Td=0.0)
     channel1 = PIDChannel(output_idx=1, input_idx=1, K=3.0, Ti=1.0, Td=0.0)
     config = PIDControllerConfiguration(
-        n_inputs=2, n_outputs=2, channels=[channel0, channel1], t=0.1,
+        n_inputs=2,
+        n_outputs=2,
+        channels=[channel0, channel1],
+        t=0.1,
         u0=torch.tensor([0.0, 0.0], dtype=torch.float64),
     )
     state = PIDControllerState.initial_state_for(config)
@@ -78,7 +88,9 @@ def test_pid_mimo_channels_track_independently():
         dynamics, torch.tensor([0.0, 0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[1.0, -1.0]] * 200, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(setpoints, duration=20.0, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        setpoints, duration=20.0, num_substeps=2
+    )
 
     assert y_all[-1, 0].item() == pytest.approx(1.0, abs=0.05)
     assert y_all[-1, 1].item() == pytest.approx(-1.0, abs=0.05)
@@ -86,8 +98,10 @@ def test_pid_mimo_channels_track_independently():
 
 def test_pid_respects_u_bounds_throughout_simulation():
     config, state = _make_siso_pid(
-        K=50.0, Ti=1.0,
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        K=50.0,
+        Ti=1.0,
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
     )
     dynamics = _stable_siso_dynamics()
     closed_system = PIDControllerClosedSystem(
@@ -96,7 +110,9 @@ def test_pid_respects_u_bounds_throughout_simulation():
     # Setpoint far outside the plant's reasonable range forces the
     # controller to saturate for a long time.
     setpoints = torch.tensor([[1000.0]] * 100, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(setpoints, duration=10.0, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        setpoints, duration=10.0, num_substeps=2
+    )
 
     assert (u_all[:, 0] <= 1.0 + 1e-9).all()
     assert (u_all[:, 0] >= -1.0 - 1e-9).all()

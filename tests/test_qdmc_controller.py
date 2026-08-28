@@ -126,7 +126,9 @@ def test_qdmc_state_rejects_wrong_warm_start_shape():
 def test_qdmc_closed_system_rejects_state_horizon_mismatch():
     config = _basic_config(N=3, Nu=2, D=7)
     bad_past_du = torch.zeros(2, 1, dtype=torch.float64)  # wrong horizon (should be 6)
-    bad_state = QDMCControllerState(bad_past_du, torch.zeros(1, dtype=torch.float64), config)
+    bad_state = QDMCControllerState(
+        bad_past_du, torch.zeros(1, dtype=torch.float64), config
+    )
     dynamics = _stable_siso_dynamics()
     with pytest.raises(ValueError, match="dynamics horizon"):
         QDMCControllerClosedSystem(dynamics, config, bad_state)
@@ -149,7 +151,9 @@ def test_qdmc_closed_system_rejects_plant_input_mismatch():
 def test_qdmc_closed_system_warns_when_controller_u_max_looser_than_plant():
     config = _basic_config()  # no u_max at all
     state = QDMCControllerState.initial_state_for(config)
-    dynamics = _stable_siso_dynamics(u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]))
+    dynamics = _stable_siso_dynamics(
+        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0])
+    )
 
     with pytest.warns(RuntimeWarning, match="looser"):
         QDMCControllerClosedSystem(dynamics, config, state)
@@ -183,7 +187,9 @@ def test_qdmc_step_rejects_wrong_r_traj_shape():
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
-    bad_r_traj = torch.tensor([[0.5], [0.5]], dtype=torch.float64)  # should have length N=3
+    bad_r_traj = torch.tensor(
+        [[0.5], [0.5]], dtype=torch.float64
+    )  # should have length N=3
     with pytest.raises(ValueError):
         closed_system.step(y, bad_r_traj)
 
@@ -196,11 +202,15 @@ def test_qdmc_step_unconstrained_matches_dmc_solution():
 
     dmc_config = DMCControllerConfiguration(S, N, Nu, _zero_op())
     dmc_state = DMCControllerState.initial_state_for(dmc_config)
-    dmc_closed = DMCControllerClosedSystem(_stable_siso_dynamics(), dmc_config, dmc_state)
+    dmc_closed = DMCControllerClosedSystem(
+        _stable_siso_dynamics(), dmc_config, dmc_state
+    )
 
     qdmc_config = QDMCControllerConfiguration(S, N, Nu, _zero_op())
     qdmc_state = QDMCControllerState.initial_state_for(qdmc_config)
-    qdmc_closed = QDMCControllerClosedSystem(_stable_siso_dynamics(), qdmc_config, qdmc_state)
+    qdmc_closed = QDMCControllerClosedSystem(
+        _stable_siso_dynamics(), qdmc_config, qdmc_state
+    )
 
     y = torch.tensor([0.0], dtype=torch.float64)
     r_traj = torch.tensor([[0.5], [0.5], [0.5]], dtype=torch.float64)
@@ -213,8 +223,11 @@ def test_qdmc_step_unconstrained_matches_dmc_solution():
 
 def test_qdmc_step_respects_u_max_strict_policy():
     config = _basic_config(
-        N=3, Nu=2, D=5,
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        N=3,
+        Nu=2,
+        D=5,
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
     )
     state = QDMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
@@ -270,7 +283,9 @@ def test_qdmc_simulate_returns_consistent_shapes():
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[0.5]] * 6, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=3.0, dt=1.0, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=3.0, dt=1.0, num_substeps=2
+    )
 
     assert t_all.shape[0] == y_all.shape[0]
     assert y_all.shape[1] == 1

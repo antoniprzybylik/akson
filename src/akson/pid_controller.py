@@ -10,18 +10,20 @@ from ._validation import (
     validate_tensor_shape_with_names,
     validate_tensor,
     validate_and_move_optional_tensor,
-    validate_optional_tensors_le
+    validate_optional_tensors_le,
 )
+
 
 @dataclass(frozen=True)
 class PIDChannel:
-    """! Single SISO channel of MIMO PID controller. """
+    """! Single SISO channel of MIMO PID controller."""
+
     output_idx: int
     input_idx: int
     K: float
     Ti: float
     Td: float
-    
+
     def __post_init__(self):
         if not isinstance(self.output_idx, int) or self.output_idx < 0:
             raise ValueError("output_idx must be a nonnegative integer")
@@ -32,12 +34,14 @@ class PIDChannel:
         if self.Td < 0:
             raise ValueError("Td must be nonnegative")
 
+
 class PIDControllerConfiguration:
     """! PID controller configuration.
 
     The MIMO PID controller consists of lattice of SISO PID
     controllers. Each of the SISO controllers works independently.
     """
+
     def __init__(
         self,
         n_inputs: int,
@@ -48,7 +52,7 @@ class PIDControllerConfiguration:
         u_min: Optional[torch.Tensor] = None,
         u_max: Optional[torch.Tensor] = None,
         dtype: torch.dtype = torch.float64,
-        device: torch.device = torch.device("cpu")
+        device: torch.device = torch.device("cpu"),
     ):
         """! Constructor of the PIDControllerConfiguration class
 
@@ -73,9 +77,13 @@ class PIDControllerConfiguration:
         for channel in channels:
             io_pair = (channel.input_idx, channel.output_idx)
             if n_inputs <= channel.input_idx:
-                raise ValueError(f"Channel {io_pair} points to nonexisting input {channel.input_idx}.")
+                raise ValueError(
+                    f"Channel {io_pair} points to nonexisting input {channel.input_idx}."
+                )
             if n_outputs <= channel.output_idx:
-                raise ValueError(f"Channel {io_pair} points to nonexisting output {channel.output_idx}.")
+                raise ValueError(
+                    f"Channel {io_pair} points to nonexisting output {channel.output_idx}."
+                )
             if io_pair in io_pairs:
                 raise ValueError(f"Channel {io_pair} defined twice.")
             io_pairs.add(io_pair)
@@ -87,31 +95,42 @@ class PIDControllerConfiguration:
 
         # Validate and store bounds
         self.u_min = validate_and_move_optional_tensor(
-                u_min, "u_min", (self.n_inputs,),
-                desired_dtype=self.dtype, desired_device=self.device
+            u_min,
+            "u_min",
+            (self.n_inputs,),
+            desired_dtype=self.dtype,
+            desired_device=self.device,
         )
         self.u_max = validate_and_move_optional_tensor(
-                u_max, "u_max", (self.n_inputs,),
-                desired_dtype=self.dtype, desired_device=self.device
+            u_max,
+            "u_max",
+            (self.n_inputs,),
+            desired_dtype=self.dtype,
+            desired_device=self.device,
         )
         validate_optional_tensors_le(self.u_min, "u_min", self.u_max, "u_max")
 
         # Validate u0
         self.u0 = validate_and_move_optional_tensor(
-                u0, "u0", (self.n_inputs,),
-                desired_dtype=self.dtype, desired_device=self.device
+            u0,
+            "u0",
+            (self.n_inputs,),
+            desired_dtype=self.dtype,
+            desired_device=self.device,
         )
         validate_optional_tensors_le(self.u_min, "u_min", self.u0, "u0")
         validate_optional_tensors_le(self.u0, "u0", self.u_max, "u_max")
 
         # Build discrete PID coefficients table
-        self.coeffs = torch.zeros((n_inputs, n_outputs, 3), dtype=self.dtype, device=self.device)
+        self.coeffs = torch.zeros(
+            (n_inputs, n_outputs, 3), dtype=self.dtype, device=self.device
+        )
         for channel in channels:
             K = channel.K
             Ti = channel.Ti
             Td = channel.Td
-            r0 = K * (1. + t / (2. * Ti) + Td / t)
-            r1 = K * (t / (2. * Ti) - 2. * Td / t - 1.)
+            r0 = K * (1.0 + t / (2.0 * Ti) + Td / t)
+            r1 = K * (t / (2.0 * Ti) - 2.0 * Td / t - 1.0)
             r2 = K * Td / t
             self.coeffs[channel.input_idx, channel.output_idx, 0] = r0
             self.coeffs[channel.input_idx, channel.output_idx, 1] = r1
@@ -141,16 +160,21 @@ class PIDControllerConfiguration:
             missing = [i for i in valid_indices if i not in value]
             if missing:
                 raise ValueError(f"{arg_name} is missing entries for indices {missing}")
+
         output_indices = sorted({channel.output_idx for channel in self.channels})
         input_indices = sorted({channel.input_idx for channel in self.channels})
         _validate_dict(setpoint_registers, output_indices, "setpoint_registers")
-        _validate_dict(controller_input_registers, output_indices, "controller_input_registers")
-        _validate_dict(controller_output_registers, input_indices, "controller_output_registers")
+        _validate_dict(
+            controller_input_registers, output_indices, "controller_input_registers"
+        )
+        _validate_dict(
+            controller_output_registers, input_indices, "controller_output_registers"
+        )
 
         # Resolve timer name and period literal
         period_ms = self.t * 1000.0
         period_ms_rounded = round(period_ms)
-        if period_ms_rounded == 0.:
+        if period_ms_rounded == 0.0:
             raise ValueError("Rounded timer period is 0ms!")
         if abs(period_ms - period_ms_rounded) > 1e-6:
             warnings.warn(
@@ -218,12 +242,14 @@ class PIDControllerConfiguration:
 
 
 class PIDControllerState:
-    """! PID controller state. """
-    def __init__(self,
+    """! PID controller state."""
+
+    def __init__(
+        self,
         n_inputs: int,
         n_outputs: int,
         dtype: torch.dtype = torch.float64,
-        device: torch.device = torch.device("cpu")
+        device: torch.device = torch.device("cpu"),
     ):
         """! Constructor of the PIDControllerState class
 
@@ -236,11 +262,15 @@ class PIDControllerState:
         self.device = device
 
         self.e_prev = torch.zeros((n_outputs,), dtype=self.dtype, device=self.device)
-        self.e_prev_prev = torch.zeros((n_outputs,), dtype=self.dtype, device=self.device)
+        self.e_prev_prev = torch.zeros(
+            (n_outputs,), dtype=self.dtype, device=self.device
+        )
         self.u_prev = torch.zeros((n_inputs,), dtype=self.dtype, device=self.device)
 
     @staticmethod
-    def initial_state_for(controller_configuration: 'PIDControllerConfiguration') -> 'PIDControllerState':
+    def initial_state_for(
+        controller_configuration: "PIDControllerConfiguration",
+    ) -> "PIDControllerState":
         """! Constructs DMC controller zero state compatible with provided controller configuration.
 
         @param controller_configuration PID controller configuration
@@ -253,13 +283,16 @@ class PIDControllerState:
             device=controller_configuration.device,
         )
 
+
 class PIDControllerClosedSystem:
-    """! Closed system with plant and PID controller. """
-    def __init__(self,
-        plant_dynamics: 'StateSpaceDynamics',
+    """! Closed system with plant and PID controller."""
+
+    def __init__(
+        self,
+        plant_dynamics: "StateSpaceDynamics",
         initial_state: torch.Tensor,
-        config: 'PIDControllerConfiguration',
-        state: 'PIDControllerState'
+        config: "PIDControllerConfiguration",
+        state: "PIDControllerState",
     ):
         """! Constructor of the PIDControllerClosedSystem class.
 
@@ -269,9 +302,13 @@ class PIDControllerClosedSystem:
         @param state PID controller state
         """
         if plant_dynamics.n_inputs != config.n_inputs:
-            raise ValueError("Plant dynamics and PID configuration do not conform. Different assumed number of system inputs.")
+            raise ValueError(
+                "Plant dynamics and PID configuration do not conform. Different assumed number of system inputs."
+            )
         if plant_dynamics.n_outputs != config.n_outputs:
-            raise ValueError("Plant dynamics and PID configuration do not conform. Different assumed number of system outputs.")
+            raise ValueError(
+                "Plant dynamics and PID configuration do not conform. Different assumed number of system outputs."
+            )
 
         self.plant = StateSpaceSystem(plant_dynamics, x=initial_state)
         self.config = config
@@ -282,35 +319,44 @@ class PIDControllerClosedSystem:
 
     def step(self, y: torch.Tensor, setpoint: torch.Tensor) -> torch.Tensor:
         """! Compute next control input u given current measurement y and desired output "setpoint".
-    
+
         @param y Current measured output
             Shape: (n_outputs,)
         @param setpoint Desired plant output
             Shape: (n_outputs,)
-    
+
         @return u Next control input
             Shape: (n_inputs,)
         """
         # Validate current measured output y
         validate_tensor(y, "y", (self.plant.n_outputs,))
         if y.device != self.device:
-            raise ValueError(f"`y` must be on the same device as controller ({self.device}), but it is on device {y.device}")
+            raise ValueError(
+                f"`y` must be on the same device as controller ({self.device}), but it is on device {y.device}"
+            )
 
         # Validate setpoint
         validate_tensor(setpoint, "setpoint", (self.plant.n_outputs,))
         if setpoint.device != self.device:
-            raise ValueError(f"`setpoint` must be on the same device as controller ({self.device}), but it is on device {setpoint.device}")
-        
+            raise ValueError(
+                f"`setpoint` must be on the same device as controller ({self.device}), but it is on device {setpoint.device}"
+            )
+
         e = setpoint - y
-        u_new = self.config.coeffs[:, :, 0] @ e + self.config.coeffs[:, :, 1] @ self.state.e_prev + self.config.coeffs[:, :, 2] @ self.state.e_prev_prev + self.state.u_prev
+        u_new = (
+            self.config.coeffs[:, :, 0] @ e
+            + self.config.coeffs[:, :, 1] @ self.state.e_prev
+            + self.config.coeffs[:, :, 2] @ self.state.e_prev_prev
+            + self.state.u_prev
+        )
 
         # Clamping anti-windup
         if self.config.u_min is not None:
-            violated = (u_new < (self.config.u_min-self.config.u0))
-            u_new[violated] = (self.config.u_min-self.config.u0)[violated]
+            violated = u_new < (self.config.u_min - self.config.u0)
+            u_new[violated] = (self.config.u_min - self.config.u0)[violated]
         if self.config.u_max is not None:
-            violated = (u_new > (self.config.u_max-self.config.u0))
-            u_new[violated] = (self.config.u_max-self.config.u0)[violated]
+            violated = u_new > (self.config.u_max - self.config.u0)
+            u_new[violated] = (self.config.u_max - self.config.u0)[violated]
 
         self.state.e_prev_prev = self.state.e_prev
         self.state.e_prev = e
@@ -326,13 +372,13 @@ class PIDControllerClosedSystem:
         solver: Optional[object] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """! Simulate a closed-loop system.
-    
+
         @param setpoints Setpoints for consecutive controller steps
             Shape: (length, n_outputs). If shorter than needed, extended with last element
         @param duration Total simulation time
         @param num_substeps Number of substeps per dt (increase to improve trajectory resolution)
         @param solver mini-ode solver object
-    
+
         @return t_all Tensor of all time points
             Shape: (num_points,)
         @return y_all Tensor of output values at each time point
@@ -344,17 +390,19 @@ class PIDControllerClosedSystem:
         if num_substeps < 1:
             raise ValueError("num_substeps must be at least 1")
         validate_tensor_shape_with_names(
-            setpoints, "setpoints",
-            (None, self.plant.n_outputs), ("n_setpoints", None),
-            ("number of setpoints", None)
+            setpoints,
+            "setpoints",
+            (None, self.plant.n_outputs),
+            ("n_setpoints", None),
+            ("number of setpoints", None),
         )
-    
+
         # Solver step size
         if num_substeps is not None:
             step_size = self.config.t / num_substeps
         else:
             step_size = None
-    
+
         # Resolve the ODE solver
         step_size, solver = resolve_default_solver(
             duration,
@@ -364,7 +412,7 @@ class PIDControllerClosedSystem:
             require_fixed_step=False,
             discrete=False,
         )
-    
+
         # Number of controller control computation steps
         num_steps = int(duration / self.config.t)
 
@@ -401,7 +449,7 @@ class PIDControllerClosedSystem:
             traced_ode_fn = self.plant.dynamics._create_traced_ode_function(u_new)
             t_span = (current_t, current_t + self.config.t)
             y0 = current_x.to(torch.float64)
-            t_sub, x_sub = solver.solve(traced_ode_fn, t_span, y0) 
+            t_sub, x_sub = solver.solve(traced_ode_fn, t_span, y0)
             self.plant.dynamics._validate_x(x_sub)
 
             # Compute y at each sub-point (validated against y_min/y_max)
@@ -409,13 +457,13 @@ class PIDControllerClosedSystem:
                 self.plant.dynamics._g(x_sub[j].to(self.dtype), u_new)
                 for j in range(len(t_sub))
             ]
-    
+
             # Append new sub-points. Exclude the first, which is
             # the same as previous one
             t_all.extend(t_sub[1:].tolist())
             y_all.extend(y_sub[1:])
             u_all.append(u_new)
-    
+
             # Update for next step
             current_x = x_sub[-1].to(self.dtype)
             current_t = t_sub[-1].item()
@@ -423,12 +471,14 @@ class PIDControllerClosedSystem:
 
         self.plant.x = current_x
         self.plant.simulation_time = current_t
-    
-        return torch.tensor(t_all, dtype=self.dtype, device=self.device), torch.stack(y_all), torch.stack(u_all)
 
-    def reset(
-        self
-    ) -> None:
-        """Reset the plant state and the controller state. """
+        return (
+            torch.tensor(t_all, dtype=self.dtype, device=self.device),
+            torch.stack(y_all),
+            torch.stack(u_all),
+        )
+
+    def reset(self) -> None:
+        """Reset the plant state and the controller state."""
         self.plant.reset()
         self.state = PIDControllerState.initial_state_for(self.config)

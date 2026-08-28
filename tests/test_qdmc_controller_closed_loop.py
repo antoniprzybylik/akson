@@ -49,7 +49,9 @@ def test_qdmc_converges_to_constant_setpoint_siso():
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[2.0]] * 60, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=30.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=30.0, dt=0.5, num_substeps=2
+    )
 
     assert y_all[-1, 0].item() == pytest.approx(2.0, abs=0.1)
 
@@ -59,7 +61,9 @@ def test_qdmc_mimo_tracks_both_channels():
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1.5, -0.5]] * 60, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=30.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=30.0, dt=0.5, num_substeps=2
+    )
 
     assert y_all[-1, 0].item() == pytest.approx(1.5, abs=0.15)
     assert y_all[-1, 1].item() == pytest.approx(-0.5, abs=0.15)
@@ -68,12 +72,15 @@ def test_qdmc_mimo_tracks_both_channels():
 def test_qdmc_strict_policy_respects_u_bounds_throughout_simulation():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
+        u_min=torch.tensor([-1.0]),
+        u_max=torch.tensor([1.0]),
     )
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1000.0]] * 40, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=20.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=20.0, dt=0.5, num_substeps=2
+    )
 
     assert (u_all[:, 0] <= 1.0 + 1e-3).all()
     assert (u_all[:, 0] >= -1.0 - 1e-3).all()
@@ -82,14 +89,17 @@ def test_qdmc_strict_policy_respects_u_bounds_throughout_simulation():
 def test_qdmc_strict_policy_respects_y_bounds_for_feasible_setpoint():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        y_min=torch.tensor([-5.0]), y_max=torch.tensor([5.0]),
+        y_min=torch.tensor([-5.0]),
+        y_max=torch.tensor([5.0]),
     )
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     # Setpoint well within [y_min, y_max]: the strict-policy QP should
     # remain feasible throughout and never push y outside its bounds.
     r_traj = torch.tensor([[3.0]] * 40, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=20.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=20.0, dt=0.5, num_substeps=2
+    )
 
     assert (y_all[:, 0] <= 5.0 + 1e-2).all()
     assert (y_all[:, 0] >= -5.0 - 1e-2).all()
@@ -98,12 +108,15 @@ def test_qdmc_strict_policy_respects_y_bounds_for_feasible_setpoint():
 def test_qdmc_respects_du_bounds_throughout_simulation():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        du_min=torch.tensor([-0.02]), du_max=torch.tensor([0.02]),
+        du_min=torch.tensor([-0.02]),
+        du_max=torch.tensor([0.02]),
     )
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1000.0]] * 40, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=20.0, dt=0.5, num_substeps=2)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=20.0, dt=0.5, num_substeps=2
+    )
 
     du = u_all[1:, 0] - u_all[:-1, 0]
     assert (du <= 0.02 + 1e-3).all()
@@ -113,15 +126,20 @@ def test_qdmc_respects_du_bounds_throughout_simulation():
 def test_qdmc_soft_policy_runs_without_raising_when_target_outside_y_bounds():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        y_min=torch.tensor([-1.0]), y_max=torch.tensor([1.0]),
-        policy="soft", rho_min=10.0, rho_max=10.0,
+        y_min=torch.tensor([-1.0]),
+        y_max=torch.tensor([1.0]),
+        policy="soft",
+        rho_min=10.0,
+        rho_max=10.0,
     )
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     # Setpoint outside [y_min, y_max]; a strict policy might struggle, soft
     # should simply produce a (possibly bound-violating) solution.
     r_traj = torch.tensor([[10.0]] * 10, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=5.0, dt=0.5, num_substeps=1)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=5.0, dt=0.5, num_substeps=1
+    )
 
     assert t_all.shape[0] > 0
 
@@ -129,13 +147,18 @@ def test_qdmc_soft_policy_runs_without_raising_when_target_outside_y_bounds():
 def test_qdmc_minimize_violation_policy_runs_without_raising():
     dynamics, config, state = _siso_config(
         regularisation=0.1,
-        y_min=torch.tensor([-1.0]), y_max=torch.tensor([1.0]),
-        policy="minimize_violation", rho_min=10.0, rho_max=10.0,
+        y_min=torch.tensor([-1.0]),
+        y_max=torch.tensor([1.0]),
+        policy="minimize_violation",
+        rho_min=10.0,
+        rho_max=10.0,
     )
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[10.0]] * 10, dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=5.0, dt=0.5, num_substeps=1)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=5.0, dt=0.5, num_substeps=1
+    )
 
     assert t_all.shape[0] > 0
 
@@ -169,7 +192,9 @@ def test_qdmc_simulate_extends_short_r_traj_with_last_value():
     closed_system = QDMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1.0], [2.0]], dtype=torch.float64)
-    t_all, y_all, u_all = closed_system.simulate(r_traj, duration=10.0, dt=0.5, num_substeps=1)
+    t_all, y_all, u_all = closed_system.simulate(
+        r_traj, duration=10.0, dt=0.5, num_substeps=1
+    )
 
     assert t_all.shape[0] > 0
     assert y_all.shape[0] == t_all.shape[0]
