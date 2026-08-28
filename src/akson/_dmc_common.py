@@ -14,7 +14,7 @@ def build_dynamic_matrices(
     N: int,
     Nu: int,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """! Builds dynamic matrix M and matrix of past dynamics Mp for DMC and QDMC regulators.
+    """! Builds dynamic matrix M and matrix of past dynamics Mp for DMC and QDMC controllers.
 
     @param step_response Discrete step response
         Shape: (D, n_outputs, n_inputs)
@@ -87,7 +87,7 @@ def zero_past_du_and_current_u(
 
 
 class BaseDMCState(ABC):
-    """! Base class for DMC family regulator states. """
+    """! Base class for DMC family controller states. """
     def __init__(
         self,
         past_du: torch.Tensor,
@@ -115,58 +115,58 @@ class BaseDMCState(ABC):
         self.device = past_du.device
 
 class BaseDMCClosedSystem(ABC):
-    """! Base class for DMC family regulator closed systems. """
+    """! Base class for DMC family controller closed systems. """
     def __init__(
         self,
         plant_dynamics: 'StateSpaceDynamics',
-        regulator_configuration: 'DMCRegulatorConfiguration' | 'QDMCRegulatorConfiguration',
-        regulator_state: 'DMCRegulatorState' | 'QDMCRegulatorState'
+        controller_configuration: 'DMCControllerConfiguration' | 'QDMCControllerConfiguration',
+        controller_state: 'DMCControllerState' | 'QDMCControllerState'
     ):
         """! Constructor.
 
         @param plant_dynamics Plant dynamics
-        @param regulator_configuration Regulator configuration
-        @param regulator_state Regulator state
+        @param Controller_configuration Controller configuration
+        @param controller_state Controller state
         """
-        if regulator_state.past_du.shape[0] != regulator_configuration.D-1:
-            raise ValueError("Regulator state and regulator configuration do not conform. Different assumed dynamics horizon.")
-        if regulator_state.past_du.shape[1] != regulator_configuration.n_inputs:
-            raise ValueError("Regulator state and regulator configuration do not conform. Different assumed number of system inputs.")
-        if regulator_state.current_u.shape[0] != regulator_configuration.n_inputs:
-            raise ValueError("Regulator state and regulator configuration do not conform. Different assumed number of system inputs.")
+        if controller_state.past_du.shape[0] != controller_configuration.D-1:
+            raise ValueError("Controller state and controller configuration do not conform. Different assumed dynamics horizon.")
+        if controller_state.past_du.shape[1] != controller_configuration.n_inputs:
+            raise ValueError("Controller state and controller configuration do not conform. Different assumed number of system inputs.")
+        if controller_state.current_u.shape[0] != controller_configuration.n_inputs:
+            raise ValueError("Controller state and controller configuration do not conform. Different assumed number of system inputs.")
 
-        if plant_dynamics.n_inputs != regulator_configuration.n_inputs:
-            raise ValueError("Plant dynamics and regulator configuration do not conform. Different assumed number of system inputs.")
-        if plant_dynamics.n_outputs != regulator_configuration.n_outputs:
-            raise ValueError("Plant dynamics and regulator configuration do not conform. Different assumed number of system outputs.")
+        if plant_dynamics.n_inputs != controller_configuration.n_inputs:
+            raise ValueError("Plant dynamics and controller configuration do not conform. Different assumed number of system inputs.")
+        if plant_dynamics.n_outputs != controller_configuration.n_outputs:
+            raise ValueError("Plant dynamics and controller configuration do not conform. Different assumed number of system outputs.")
         validate_tensor(
-            regulator_configuration.operating_point.x,
-            "regulator_configuration.operating_point.x",
+            controller_configuration.operating_point.x,
+            "controller_configuration.operating_point.x",
             (plant_dynamics.state_size,)
         )
 
-        if plant_dynamics.device != regulator_configuration.device or regulator_configuration.device != regulator_state.device:
+        if plant_dynamics.device != controller_configuration.device or controller_configuration.device != controller_state.device:
             raise ValueError("Devices do not match.")
         self.device = plant_dynamics.device
-        if plant_dynamics.dtype != regulator_configuration.dtype or regulator_configuration.dtype != regulator_state.dtype:
+        if plant_dynamics.dtype != controller_configuration.dtype or controller_configuration.dtype != controller_state.dtype:
             raise ValueError("Datatypes do not match.")
         self.dtype = plant_dynamics.dtype
 
-        if (plant_dynamics.u_min is not None and regulator_configuration.u_min is not None and (plant_dynamics.u_min > regulator_configuration.u_max).any()) or (plant_dynamics.u_min is not None and regulator_configuration.u_min is None):
+        if (plant_dynamics.u_min is not None and controller_configuration.u_min is not None and (plant_dynamics.u_min > controller_configuration.u_max).any()) or (plant_dynamics.u_min is not None and controller_configuration.u_min is None):
             warnings.warn(
-                "Constraints on u_min are looser in the regulator than in the plant. This may lead to regulator feeding infeasible input into the plant",
+                "Constraints on u_min are looser in the controller than in the plant. This may lead to controller feeding infeasible input into the plant",
                 RuntimeWarning,
             )
 
-        if (plant_dynamics.u_max is not None and regulator_configuration.u_max is not None and (plant_dynamics.u_max > regulator_configuration.u_max).any()) or (plant_dynamics.u_max is not None and regulator_configuration.u_max is None):
+        if (plant_dynamics.u_max is not None and controller_configuration.u_max is not None and (plant_dynamics.u_max > controller_configuration.u_max).any()) or (plant_dynamics.u_max is not None and controller_configuration.u_max is None):
             warnings.warn(
-                "Constraints on u_max are looser in the regulator than in the plant. This may lead to regulator feeding infeasible input into the plant",
+                "Constraints on u_max are looser in the controller than in the plant. This may lead to controller feeding infeasible input into the plant",
                 RuntimeWarning,
             )
 
-        self.plant = StateSpaceSystem(plant_dynamics, x=regulator_configuration.operating_point.x)
-        self.config = regulator_configuration
-        self.state = regulator_state
+        self.plant = StateSpaceSystem(plant_dynamics, x=controller_configuration.operating_point.x)
+        self.config = controller_configuration
+        self.state = controller_state
 
     @abstractmethod
     def step(self, y: torch.Tensor, r_traj: torch.Tensor) -> torch.Tensor:
@@ -195,7 +195,7 @@ class BaseDMCClosedSystem(ABC):
         @param r_traj Reference trajectory
             Shape: (length, n_outputs). If shorter than needed, extended with last element
         @param duration Total simulation time
-        @param dt Time step for regulator updates
+        @param dt Time step for controller updates
         @param num_substeps Number of substeps per dt (increase to improve trajectory resolution)
         @param solver mini-ode solver object
     
@@ -231,7 +231,7 @@ class BaseDMCClosedSystem(ABC):
             discrete=False,
         )
     
-        # Number of regulator control computation steps
+        # Number of controller control computation steps
         num_steps = int(duration / dt)
 
         # Extend / cut the reference trajectory
@@ -259,7 +259,7 @@ class BaseDMCClosedSystem(ABC):
             # Get r_traj for this step
             r_traj_step = r_full[i+1 : i+1 + self.config.N]
 
-            # Calculate control input from the regulator
+            # Calculate control input from the controller
             u_new = self.step(y, r_traj_step)
             self.plant.dynamics._validate_u(u_new)
 
@@ -296,5 +296,5 @@ class BaseDMCClosedSystem(ABC):
     def reset(
         self
     ) -> None:
-        """Reset the plant state and the regulator state. """
+        """Reset the plant state and the controller state. """
         pass

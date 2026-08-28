@@ -2,29 +2,29 @@ from .state_space_system import StateSpaceDynamics
 from .state_space_system import StateSpaceSystem
 from .state_space_system import OperatingPoint
 
-from .pid_regulator import PIDChannel
-from .pid_regulator import PIDRegulatorConfiguration
-from .pid_regulator import PIDRegulatorState
-from .pid_regulator import PIDRegulatorClosedSystem
-from .dmc_regulator import DMCRegulatorState
-from .dmc_regulator import DMCRegulatorConfiguration
-from .dmc_regulator import DMCRegulatorClosedSystem
-from .qdmc_regulator import QDMCRegulatorState
-from .qdmc_regulator import QDMCRegulatorConfiguration
-from .qdmc_regulator import QDMCRegulatorClosedSystem
+from .pid_controller import PIDChannel
+from .pid_controller import PIDControllerConfiguration
+from .pid_controller import PIDControllerState
+from .pid_controller import PIDControllerClosedSystem
+from .dmc_controller import DMCControllerState
+from .dmc_controller import DMCControllerConfiguration
+from .dmc_controller import DMCControllerClosedSystem
+from .qdmc_controller import QDMCControllerState
+from .qdmc_controller import QDMCControllerConfiguration
+from .qdmc_controller import QDMCControllerClosedSystem
 
 __all__ = [
     "StateSpaceDynamics",
     "StateSpaceSystem",
     "OperatingPoint",
     "PIDChannel",
-    "PIDRegulatorConfiguration",
-    "PIDRegulatorState",
-    "PIDRegulatorClosedSystem",
-    "DMCRegulatorState",
-    "DMCRegulatorConfiguration",
-    "DMCRegulatorClosedSystem",
-    "QDMCRegulatorState",
-    "QDMCRegulatorConfiguration",
-    "QDMCRegulatorClosedSystem",
+    "PIDControllerConfiguration",
+    "PIDControllerState",
+    "PIDControllerClosedSystem",
+    "DMCControllerState",
+    "DMCControllerConfiguration",
+    "DMCControllerClosedSystem",
+    "QDMCControllerState",
+    "QDMCControllerConfiguration",
+    "QDMCControllerClosedSystem",
 ]

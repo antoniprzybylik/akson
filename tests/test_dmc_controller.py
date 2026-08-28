@@ -3,9 +3,9 @@ import torch
 
 from akson import StateSpaceDynamics, OperatingPoint
 from akson import (
-    DMCRegulatorConfiguration,
-    DMCRegulatorState,
-    DMCRegulatorClosedSystem,
+    DMCControllerConfiguration,
+    DMCControllerState,
+    DMCControllerClosedSystem,
 )
 
 
@@ -30,7 +30,7 @@ def _basic_config(N=3, Nu=2, D=5, **kwargs):
         x=torch.tensor([0.0], dtype=torch.float64),
         y=torch.tensor([0.0], dtype=torch.float64),
     )
-    return DMCRegulatorConfiguration(S, N, Nu, op, **kwargs)
+    return DMCControllerConfiguration(S, N, Nu, op, **kwargs)
 
 
 def test_dmc_config_rejects_bad_step_response_ndim():
@@ -39,7 +39,7 @@ def test_dmc_config_rejects_bad_step_response_ndim():
         torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64)
     )
     with pytest.raises(ValueError):
-        DMCRegulatorConfiguration(S, N=3, Nu=2, operating_point=op)
+        DMCControllerConfiguration(S, N=3, Nu=2, operating_point=op)
 
 
 def test_dmc_config_rejects_empty_step_response():
@@ -48,7 +48,7 @@ def test_dmc_config_rejects_empty_step_response():
         torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64)
     )
     with pytest.raises(ValueError, match="must not contain less than one sample"):
-        DMCRegulatorConfiguration(S, N=3, Nu=2, operating_point=op)
+        DMCControllerConfiguration(S, N=3, Nu=2, operating_point=op)
 
 
 def test_dmc_config_rejects_nonpositive_N():
@@ -105,37 +105,37 @@ def test_dmc_config_sum_input_deltas_array_shape():
 
 
 def test_dmc_state_zero_state_shapes():
-    state = DMCRegulatorState.zero_state(dynamics_horizon=5, n_inputs=2)
+    state = DMCControllerState.zero_state(dynamics_horizon=5, n_inputs=2)
     assert state.past_du.shape == (4, 2)
     assert state.current_u.shape == (2,)
 
 
 def test_dmc_state_initial_state_for_matches_config():
     config = _basic_config(N=3, Nu=2, D=7)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     assert state.past_du.shape == (6, 1)
     assert state.current_u.shape == (1,)
 
 
 def test_dmc_closed_system_rejects_state_horizon_mismatch():
     config = _basic_config(N=3, Nu=2, D=7)
-    bad_state = DMCRegulatorState.zero_state(dynamics_horizon=3, n_inputs=1)  # wrong horizon
+    bad_state = DMCControllerState.zero_state(dynamics_horizon=3, n_inputs=1)  # wrong horizon
     dynamics = _stable_siso_dynamics()
     with pytest.raises(ValueError, match="dynamics horizon"):
-        DMCRegulatorClosedSystem(dynamics, config, bad_state)
+        DMCControllerClosedSystem(dynamics, config, bad_state)
 
 
 def test_dmc_closed_system_rejects_state_input_count_mismatch():
     config = _basic_config(N=3, Nu=2, D=7)
-    bad_state = DMCRegulatorState.zero_state(dynamics_horizon=7, n_inputs=3)  # wrong n_inputs
+    bad_state = DMCControllerState.zero_state(dynamics_horizon=7, n_inputs=3)  # wrong n_inputs
     dynamics = _stable_siso_dynamics()
     with pytest.raises(ValueError, match="Different assumed number of system inputs"):
-        DMCRegulatorClosedSystem(dynamics, config, bad_state)
+        DMCControllerClosedSystem(dynamics, config, bad_state)
 
 
 def test_dmc_closed_system_rejects_plant_input_mismatch():
     config = _basic_config(N=3, Nu=2, D=7)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
 
     A = torch.tensor([[-1.0, 0.0], [0.0, -2.0]], dtype=torch.float64)
     B = torch.tensor([[1.0, 0.0], [0.0, 1.0]], dtype=torch.float64)
@@ -144,16 +144,16 @@ def test_dmc_closed_system_rejects_plant_input_mismatch():
     mimo_dynamics = StateSpaceDynamics.from_linear(A, B, C, D)
 
     with pytest.raises(ValueError, match="Different assumed number of system inputs"):
-        DMCRegulatorClosedSystem(mimo_dynamics, config, state)
+        DMCControllerClosedSystem(mimo_dynamics, config, state)
 
 
-def test_dmc_closed_system_warns_when_regulator_u_min_looser_than_plant():
+def test_dmc_closed_system_warns_when_controller_u_min_looser_than_plant():
     S = _siso_step_response(5)
     op = OperatingPoint(
         torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64), torch.zeros(1, dtype=torch.float64)
     )
-    config = DMCRegulatorConfiguration(S, N=3, Nu=2, operating_point=op)  # no u_min at all
-    state = DMCRegulatorState.initial_state_for(config)
+    config = DMCControllerConfiguration(S, N=3, Nu=2, operating_point=op)  # no u_min at all
+    state = DMCControllerState.initial_state_for(config)
 
     A = torch.tensor([[-1.0]], dtype=torch.float64)
     B = torch.tensor([[1.0]], dtype=torch.float64)
@@ -162,23 +162,23 @@ def test_dmc_closed_system_warns_when_regulator_u_min_looser_than_plant():
     dynamics = StateSpaceDynamics.from_linear(A, B, C, D, u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]))
 
     with pytest.warns(RuntimeWarning, match="u_min are looser"):
-        DMCRegulatorClosedSystem(dynamics, config, state)
+        DMCControllerClosedSystem(dynamics, config, state)
 
 
 def test_dmc_closed_system_valid_construction_does_not_raise():
     config = _basic_config(N=3, Nu=2, D=7)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
     assert closed_system.config is config
     assert closed_system.state is state
 
 
 def test_dmc_step_unconstrained_matches_K_times_error():
     config = _basic_config(N=3, Nu=2, D=5)  # no constraints at all
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
     r_traj = torch.tensor([[1.0], [1.0], [1.0]], dtype=torch.float64)
@@ -194,9 +194,9 @@ def test_dmc_step_unconstrained_matches_K_times_error():
 
 def test_dmc_step_clamps_du_to_du_max():
     config = _basic_config(N=3, Nu=2, D=5, du_min=torch.tensor([-0.05]), du_max=torch.tensor([0.05]))
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
     r_traj = torch.tensor([[100.0], [100.0], [100.0]], dtype=torch.float64)  # huge setpoint jump
@@ -210,9 +210,9 @@ def test_dmc_step_clamps_u_to_u_max():
         N=3, Nu=2, D=5,
         u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
     )
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
     r_traj = torch.tensor([[1000.0], [1000.0], [1000.0]], dtype=torch.float64)
@@ -223,9 +223,9 @@ def test_dmc_step_clamps_u_to_u_max():
 
 def test_dmc_step_updates_past_du_history():
     config = _basic_config(N=3, Nu=2, D=5)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
     r_traj = torch.tensor([[0.5], [0.5], [0.5]], dtype=torch.float64)
@@ -236,9 +236,9 @@ def test_dmc_step_updates_past_du_history():
 
 def test_dmc_step_rejects_wrong_y_shape():
     config = _basic_config(N=3, Nu=2, D=5)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     bad_y = torch.tensor([0.0, 0.0], dtype=torch.float64)
     r_traj = torch.tensor([[0.5], [0.5], [0.5]], dtype=torch.float64)
@@ -248,9 +248,9 @@ def test_dmc_step_rejects_wrong_y_shape():
 
 def test_dmc_step_rejects_wrong_r_traj_shape():
     config = _basic_config(N=3, Nu=2, D=5)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
     bad_r_traj = torch.tensor([[0.5], [0.5]], dtype=torch.float64)  # should have length N=3
@@ -265,9 +265,9 @@ def test_dmc_step_with_polishing_respects_constraints():
         u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
         use_polishing=True,
     )
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     y = torch.tensor([0.0], dtype=torch.float64)
     r_traj = torch.tensor([[100.0], [100.0], [100.0]], dtype=torch.float64)
@@ -278,9 +278,9 @@ def test_dmc_step_with_polishing_respects_constraints():
 
 def test_dmc_simulate_rejects_num_substeps_below_one():
     config = _basic_config(N=3, Nu=2, D=5)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1.0]] * 10, dtype=torch.float64)
     with pytest.raises(ValueError, match="num_substeps must be at least 1"):
@@ -289,9 +289,9 @@ def test_dmc_simulate_rejects_num_substeps_below_one():
 
 def test_dmc_simulate_rejects_wrong_r_traj_shape():
     config = _basic_config(N=3, Nu=2, D=5)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     bad_r_traj = torch.tensor([[1.0, 2.0]] * 10, dtype=torch.float64)  # wrong n_outputs
     with pytest.raises(ValueError):
@@ -300,9 +300,9 @@ def test_dmc_simulate_rejects_wrong_r_traj_shape():
 
 def test_dmc_simulate_returns_consistent_shapes():
     config = _basic_config(N=3, Nu=2, D=5)
-    state = DMCRegulatorState.initial_state_for(config)
+    state = DMCControllerState.initial_state_for(config)
     dynamics = _stable_siso_dynamics()
-    closed_system = DMCRegulatorClosedSystem(dynamics, config, state)
+    closed_system = DMCControllerClosedSystem(dynamics, config, state)
 
     r_traj = torch.tensor([[1.0]] * 10, dtype=torch.float64)
     t_all, y_all, u_all = closed_system.simulate(r_traj, duration=5.0, dt=1.0, num_substeps=2)

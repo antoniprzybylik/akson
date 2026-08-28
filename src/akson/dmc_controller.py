@@ -17,8 +17,8 @@ from ._validation import (
     validate_optional_tensors_le
 )
 
-class DMCRegulatorConfiguration:
-    """! Dynamic Matrix Control (DMC) regulator configuration. """
+class DMCControllerConfiguration:
+    """! Dynamic Matrix Control (DMC) controller configuration. """
     def __init__(
         self,
         step_response: torch.Tensor,
@@ -34,7 +34,7 @@ class DMCRegulatorConfiguration:
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None
     ):
-        """! Constructor of the DMCRegulatorConfiguration class
+        """! Constructor of the DMCControllerConfiguration class
 
         @param step_response Discrete step response tensor
             Shape: (length, n_outputs, n_inputs)
@@ -140,57 +140,57 @@ class DMCRegulatorConfiguration:
         # Build and store "sum input deltas" array
         self.sum_input_deltas_array = build_sum_input_deltas_array(self.N, self.Nu, self.n_inputs, self.dtype, self.device)
 
-class DMCRegulatorState(BaseDMCState):
+class DMCControllerState(BaseDMCState):
     @staticmethod
     def zero_state(
         dynamics_horizon: int,
         n_inputs: int,
         dtype: torch.dtype = torch.float64,
         device: torch.device = torch.device("cpu")
-    ) -> DMCRegulatorState:
-        """! Constructs zero state for the DMC regulator.
+    ) -> DMCControllerState:
+        """! Constructs zero state for the DMC controller.
 
         @param dynamics_horizon Dynamics horizon length
         @param n_inputs Number of inputs to the system
-        @return regulator_state DMC regulator state
+        @return controller_state DMC controller state
         """
         past_du, current_u = zero_past_du_and_current_u(dynamics_horizon, n_inputs, dtype, device)
-        return DMCRegulatorState(past_du, current_u, dtype=dtype, device=device)
+        return DMCControllerState(past_du, current_u, dtype=dtype, device=device)
 
     @staticmethod
     def initial_state_for(
-        regulator_configuration: DMCRegulatorConfiguration
-    ) -> DMCRegulatorState:
-        """! Constructs the DMCRegulatorState conformant with regulator configuration provided by the user.
+        controller_configuration: DMCControllerConfiguration
+    ) -> DMCControllerState:
+        """! Constructs the DMCControllerState conformant with controller configuration provided by the user.
 
-        @param regulator_configuration DMC regulator configuration
-        @return regulator_state DMC regulator state
+        @param controller_configuration DMC controller configuration
+        @return controller_state DMC controller state
         """
-        return DMCRegulatorState.zero_state(
-            regulator_configuration.D,
-            regulator_configuration.n_inputs,
-            dtype=regulator_configuration.dtype,
-            device=regulator_configuration.device
+        return DMCControllerState.zero_state(
+            controller_configuration.D,
+            controller_configuration.n_inputs,
+            dtype=controller_configuration.dtype,
+            device=controller_configuration.device
         )
 
-class DMCRegulatorClosedSystem(BaseDMCClosedSystem):
-    """! Closed system with plant and Dynamic Matrix Control (DMC) regulator.
+class DMCControllerClosedSystem(BaseDMCClosedSystem):
+    """! Closed system with plant and Dynamic Matrix Control (DMC) controller.
 
-    DMC regulator solves the least squares problem to find the solution of the unconstrained optimisation problem and then casts the solution onto the feasible set.
+    DMC controller solves the least squares problem to find the solution of the unconstrained optimisation problem and then casts the solution onto the feasible set.
     """
     def __init__(
         self,
         plant_dynamics: StateSpaceDynamics,
-        regulator_configuration: DMCRegulatorConfiguration,
-        regulator_state: DMCRegulatorState
+        controller_configuration: DMCControllerConfiguration,
+        controller_state: DMCControllerState
     ):
-        """! Constructor of the DMCRegulatorClosedSystem class.
+        """! Constructor of the DMCControllerClosedSystem class.
 
         @param plant_dynamics Plant dynamics
-        @param regulator_configuration DMC regulator configuration
-        @param regulator_state DMC regulator state
+        @param controller_configuration DMC controller configuration
+        @param controller_state DMC controller state
         """
-        super().__init__(plant_dynamics, regulator_configuration, regulator_state)
+        super().__init__(plant_dynamics, controller_configuration, controller_state)
 
     def _solve_constrained_problem(
         self,
@@ -297,10 +297,10 @@ class DMCRegulatorClosedSystem(BaseDMCClosedSystem):
         """
         validate_tensor(y, "y", (self.plant.n_outputs,))
         if y.device != self.device:
-            raise ValueError(f"`y` must be on the same device as regulator ({self.device}), but it is on device {y.device}")
+            raise ValueError(f"`y` must be on the same device as controller ({self.device}), but it is on device {y.device}")
         validate_tensor(r_traj, "r_traj", (self.config.N, self.plant.n_outputs))
         if r_traj.device != self.device:
-            raise ValueError(f"`r_traj` must be on the same device as regulator ({self.device}), but it is on device {r_traj.device}")
+            raise ValueError(f"`r_traj` must be on the same device as controller ({self.device}), but it is on device {r_traj.device}")
     
         r_traj_flat = r_traj.reshape(-1)
         past_du_flat = self.state.past_du.reshape(-1)
@@ -350,7 +350,7 @@ class DMCRegulatorClosedSystem(BaseDMCClosedSystem):
         # Actual control increment after enforcing constraints
         du_actual = u_new - self.state.current_u
     
-        # Update regulator state
+        # Update controller state
         self.state.past_du = torch.cat((du_actual.unsqueeze(0), self.state.past_du[:-1]), dim=0)
         self.state.current_u = u_new
     
@@ -359,6 +359,6 @@ class DMCRegulatorClosedSystem(BaseDMCClosedSystem):
     def reset(
         self
     ) -> None:
-        """Reset the plant state and the regulator state. """
+        """Reset the plant state and the controller state. """
         self.plant.reset()
-        self.state = DMCRegulatorState.initial_state_for(self.config)
+        self.state = DMCControllerState.initial_state_for(self.config)

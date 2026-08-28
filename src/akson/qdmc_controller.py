@@ -21,8 +21,8 @@ from ._validation import (
 )
 
 
-class QDMCRegulatorConfiguration:
-    """! Quadratic Dynamic Matrix Control (QDMC) regulator configuration. """
+class QDMCControllerConfiguration:
+    """! Quadratic Dynamic Matrix Control (QDMC) controller configuration. """
     def __init__(
         self,
         step_response: torch.Tensor,
@@ -42,7 +42,7 @@ class QDMCRegulatorConfiguration:
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
     ):
-        """! Constructor of the QDMCRegulatorConfiguration class
+        """! Constructor of the QDMCControllerConfiguration class
 
         @param step_response Discrete step response tensor
             Shape: (length, n_outputs, n_inputs)
@@ -163,15 +163,15 @@ class QDMCRegulatorConfiguration:
         self.sum_input_deltas_array = build_sum_input_deltas_array(self.N, self.Nu, self.n_inputs, self.dtype, self.device)
 
 
-class QDMCRegulatorState(BaseDMCState):
-    """! QDMC regulator state.
+class QDMCControllerState(BaseDMCState):
+    """! QDMC controller state.
 
     Beside standard DMC state, we store here the CVXPY problem data.
     """
     class _ProblemData:
         """! CVXPY problem data. """
-        def __init__(self, config: QDMCRegulatorConfiguration):
-            """! Constructs problem data from QDMC regulator configuration. """
+        def __init__(self, config: QDMCControllerConfiguration):
+            """! Constructs problem data from QDMC controller configuration. """
             # Helper arrays for building CVXPY problem
             M_np = config.M.cpu().numpy()
             sum_input_deltas_array_np = config.sum_input_deltas_array.cpu().numpy()
@@ -270,7 +270,7 @@ class QDMCRegulatorState(BaseDMCState):
         self,
         past_du: torch.Tensor,
         current_u: torch.Tensor,
-        config: QDMCRegulatorConfiguration,
+        config: QDMCControllerConfiguration,
         warm_start_x: Optional[torch.Tensor] = None,
     ):
         super().__init__(past_du, current_u, dtype=config.dtype, device=config.device)
@@ -283,25 +283,25 @@ class QDMCRegulatorState(BaseDMCState):
 
     @staticmethod
     def initial_state_for(
-        regulator_configuration: QDMCRegulatorConfiguration,
-    ) -> QDMCRegulatorState:
-        """! Builds initial state conforming with given QDMC regulator configuration.
+        controller_configuration: QDMCControllerConfiguration,
+    ) -> QDMCControllerState:
+        """! Builds initial state conforming with given QDMC controller configuration.
 
-        @param regulator_configuration QDMC regulator configuration
-        @return regulator_state QDMC regulator state
+        @param controller_configuration QDMC controller configuration
+        @return controller_state QDMC controller state
         """
         past_du, current_u = zero_past_du_and_current_u(
-            regulator_configuration.D, regulator_configuration.n_inputs,
-            regulator_configuration.dtype, regulator_configuration.device
+            controller_configuration.D, controller_configuration.n_inputs,
+            controller_configuration.dtype, controller_configuration.device
         )
-        return QDMCRegulatorState(
+        return QDMCControllerState(
             past_du, current_u,
-            regulator_configuration, warm_start_x=None,
+            controller_configuration, warm_start_x=None,
         )
 
 
-class QDMCRegulatorClosedSystem(BaseDMCClosedSystem):
-    """! Closed system with plant and Quadratic Dynamic Matrix Control (QDMC) regulator.
+class QDMCControllerClosedSystem(BaseDMCClosedSystem):
+    """! Closed system with plant and Quadratic Dynamic Matrix Control (QDMC) controller.
 
     In each step, QDMC finds the exact solution of the quadratic programming
     problem. This is different from heurisitic approach of classical DMC.
@@ -309,16 +309,16 @@ class QDMCRegulatorClosedSystem(BaseDMCClosedSystem):
     def __init__(
         self,
         plant_dynamics: StateSpaceDynamics,
-        regulator_configuration: QDMCRegulatorConfiguration,
-        regulator_state: QDMCRegulatorState
+        controller_configuration: QDMCControllerConfiguration,
+        controller_state: QDMCControllerState
     ):
-        """! Constructor of the QDMCRegulatorClosedSystem class.
+        """! Constructor of the QDMCControllerClosedSystem class.
 
         @param plant_dynamics Plant dynamics
-        @param regulator_configuration QDMC regulator configuration
-        @param regulator_state QDMC regulator state
+        @param controller_configuration QDMC controller configuration
+        @param controller_state QDMC controller state
         """
-        super().__init__(plant_dynamics, regulator_configuration, regulator_state)
+        super().__init__(plant_dynamics, controller_configuration, controller_state)
 
     def step(self, y: torch.Tensor, r_traj: torch.Tensor) -> torch.Tensor:
         """Compute next control input u given current measurement y and reference trajectory.
@@ -333,10 +333,10 @@ class QDMCRegulatorClosedSystem(BaseDMCClosedSystem):
         """
         validate_tensor(y, "y", (self.plant.n_outputs,))
         if y.device != self.device:
-            raise ValueError(f"`y` must be on the same device as regulator ({self.device}), but it is on device {y.device}")
+            raise ValueError(f"`y` must be on the same device as controller ({self.device}), but it is on device {y.device}")
         validate_tensor(r_traj, "r_traj", (self.config.N, self.plant.n_outputs))
         if r_traj.device != self.device:
-            raise ValueError(f"`r_traj` must be on the same device as regulator ({self.device}), but it is on device {r_traj.device}")
+            raise ValueError(f"`r_traj` must be on the same device as controller ({self.device}), but it is on device {r_traj.device}")
     
         r_traj_flat = r_traj.reshape(-1)
         past_du_flat = self.state.past_du.reshape(-1)
@@ -403,6 +403,6 @@ class QDMCRegulatorClosedSystem(BaseDMCClosedSystem):
     def reset(
         self
     ) -> None:
-        """Reset the plant state and the regulator state. """
+        """Reset the plant state and the controller state. """
         self.plant.reset()
-        self.state = QDMCRegulatorState.initial_state_for(self.config)
+        self.state = QDMCControllerState.initial_state_for(self.config)

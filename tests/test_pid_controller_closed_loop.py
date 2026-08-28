@@ -4,9 +4,9 @@ import torch
 from akson import StateSpaceDynamics
 from akson import (
     PIDChannel,
-    PIDRegulatorConfiguration,
-    PIDRegulatorState,
-    PIDRegulatorClosedSystem,
+    PIDControllerConfiguration,
+    PIDControllerState,
+    PIDControllerClosedSystem,
 )
 
 
@@ -30,19 +30,19 @@ def _decoupled_mimo_dynamics(**kwargs):
 
 def _make_siso_pid(K=2.0, Ti=1.0, Td=0.0, t=0.1, **config_kwargs):
     channel = PIDChannel(output_idx=0, input_idx=0, K=K, Ti=Ti, Td=Td)
-    config = PIDRegulatorConfiguration(
+    config = PIDControllerConfiguration(
         n_inputs=1, n_outputs=1, channels=[channel], t=t,
         u0=torch.tensor([0.0], dtype=torch.float64),
         **config_kwargs,
     )
-    state = PIDRegulatorState.initial_state_for(config)
+    state = PIDControllerState.initial_state_for(config)
     return config, state
 
 
 def test_pid_converges_to_constant_setpoint_siso():
     config, state = _make_siso_pid(K=2.0, Ti=1.0)
     dynamics = _stable_siso_dynamics()
-    closed_system = PIDRegulatorClosedSystem(
+    closed_system = PIDControllerClosedSystem(
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[2.0]] * 200, dtype=torch.float64)
@@ -54,7 +54,7 @@ def test_pid_converges_to_constant_setpoint_siso():
 def test_pid_tracks_setpoint_change():
     config, state = _make_siso_pid(K=2.0, Ti=1.0)
     dynamics = _stable_siso_dynamics()
-    closed_system = PIDRegulatorClosedSystem(
+    closed_system = PIDControllerClosedSystem(
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[1.0]] * 100 + [[3.0]] * 100, dtype=torch.float64)
@@ -68,13 +68,13 @@ def test_pid_tracks_setpoint_change():
 def test_pid_mimo_channels_track_independently():
     channel0 = PIDChannel(output_idx=0, input_idx=0, K=2.0, Ti=1.0, Td=0.0)
     channel1 = PIDChannel(output_idx=1, input_idx=1, K=3.0, Ti=1.0, Td=0.0)
-    config = PIDRegulatorConfiguration(
+    config = PIDControllerConfiguration(
         n_inputs=2, n_outputs=2, channels=[channel0, channel1], t=0.1,
         u0=torch.tensor([0.0, 0.0], dtype=torch.float64),
     )
-    state = PIDRegulatorState.initial_state_for(config)
+    state = PIDControllerState.initial_state_for(config)
     dynamics = _decoupled_mimo_dynamics()
-    closed_system = PIDRegulatorClosedSystem(
+    closed_system = PIDControllerClosedSystem(
         dynamics, torch.tensor([0.0, 0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[1.0, -1.0]] * 200, dtype=torch.float64)
@@ -90,7 +90,7 @@ def test_pid_respects_u_bounds_throughout_simulation():
         u_min=torch.tensor([-1.0]), u_max=torch.tensor([1.0]),
     )
     dynamics = _stable_siso_dynamics()
-    closed_system = PIDRegulatorClosedSystem(
+    closed_system = PIDControllerClosedSystem(
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     # Setpoint far outside the plant's reasonable range forces the
@@ -105,7 +105,7 @@ def test_pid_respects_u_bounds_throughout_simulation():
 def test_pid_simulate_is_continuous_across_calls():
     config, state = _make_siso_pid(K=1.0, Ti=2.0)
     dynamics = _stable_siso_dynamics()
-    closed_system = PIDRegulatorClosedSystem(
+    closed_system = PIDControllerClosedSystem(
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     setpoints1 = torch.tensor([[1.0]] * 50, dtype=torch.float64)
@@ -123,7 +123,7 @@ def test_pid_simulate_is_continuous_across_calls():
 def test_pid_closed_system_reflects_plant_state_between_calls():
     config, state = _make_siso_pid(K=1.0, Ti=2.0)
     dynamics = _stable_siso_dynamics()
-    closed_system = PIDRegulatorClosedSystem(
+    closed_system = PIDControllerClosedSystem(
         dynamics, torch.tensor([0.0], dtype=torch.float64), config, state
     )
     setpoints = torch.tensor([[1.0]] * 50, dtype=torch.float64)

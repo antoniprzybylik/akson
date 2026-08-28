@@ -15,7 +15,7 @@ from ._validation import (
 
 @dataclass(frozen=True)
 class PIDChannel:
-    """! Single SISO channel of MIMO PID regulator. """
+    """! Single SISO channel of MIMO PID controller. """
     output_idx: int
     input_idx: int
     K: float
@@ -32,11 +32,11 @@ class PIDChannel:
         if self.Td < 0:
             raise ValueError("Td must be nonnegative")
 
-class PIDRegulatorConfiguration:
-    """! PID regulator configuration.
+class PIDControllerConfiguration:
+    """! PID controller configuration.
 
-    The MIMO PID regulator consists of lattice of SISO PID
-    regulators. Each of the SISO regulators works independently.
+    The MIMO PID controller consists of lattice of SISO PID
+    controllers. Each of the SISO controllers works independently.
     """
     def __init__(
         self,
@@ -50,13 +50,13 @@ class PIDRegulatorConfiguration:
         dtype: torch.dtype = torch.float64,
         device: torch.device = torch.device("cpu")
     ):
-        """! Constructor of the PIDRegulatorConfiguration class
+        """! Constructor of the PIDControllerConfiguration class
 
         @param n_inputs Number of plant inputs
         @param n_outputs Number of plant outputs
-        @param channels SISO PID channels of MIMO PID regulator
+        @param channels SISO PID channels of MIMO PID controller
         @param t Discretization constant
-        @param u0 Base output (PID regulator output is relative to u0)
+        @param u0 Base output (PID controller output is relative to u0)
             Shape: (n_inputs,)
         @param u_min Minimum allowed control signal (absolute value, not u0 relative)
             Shape: (n_inputs,)
@@ -122,19 +122,19 @@ class PIDRegulatorConfiguration:
     def export_plc_code(
         self,
         setpoint_registers,
-        regulator_input_registers,
-        regulator_output_registers,
+        controller_input_registers,
+        controller_output_registers,
     ) -> str:
-        """! Generates IEC 61131-3 Structured Text code implementing this PID regulator on a PLC.
+        """! Generates IEC 61131-3 Structured Text code implementing this PID controller on a PLC.
 
         @param setpoint_registers Dictionary of the format {output_idx: register_name}.
-        @param regulator_input_registers Dictionary of the format {output_idx: register_name}.
-        @param regulator_output_registers Dictionary of the format {input_idx: register_name}.
+        @param controller_input_registers Dictionary of the format {output_idx: register_name}.
+        @param controller_output_registers Dictionary of the format {input_idx: register_name}.
 
         @return st_code Generated IEC 61131-3 Structured Text code
         """
         if len(self.channels) == 0:
-            raise ValueError("Cannot export PLC code for a regulator with no channels")
+            raise ValueError("Cannot export PLC code for a controller with no channels")
 
         # Validate arguments
         def _validate_dict(value, valid_indices, arg_name):
@@ -144,8 +144,8 @@ class PIDRegulatorConfiguration:
         output_indices = sorted({channel.output_idx for channel in self.channels})
         input_indices = sorted({channel.input_idx for channel in self.channels})
         _validate_dict(setpoint_registers, output_indices, "setpoint_registers")
-        _validate_dict(regulator_input_registers, output_indices, "regulator_input_registers")
-        _validate_dict(regulator_output_registers, input_indices, "regulator_output_registers")
+        _validate_dict(controller_input_registers, output_indices, "controller_input_registers")
+        _validate_dict(controller_output_registers, input_indices, "controller_output_registers")
 
         # Resolve timer name and period literal
         period_ms = self.t * 1000.0
@@ -180,7 +180,7 @@ class PIDRegulatorConfiguration:
             prev_e = f"prev_e{suffix}"
             prev_prev_e = f"prev_prev_e{suffix}"
             sp_reg = setpoint_registers[channel.output_idx]
-            meas_reg = regulator_input_registers[channel.output_idx]
+            meas_reg = controller_input_registers[channel.output_idx]
 
             lines.append(f"    {prev_prev_e} := {prev_e};")
             lines.append(f"    {prev_e} := {curr_e};")
@@ -189,7 +189,7 @@ class PIDRegulatorConfiguration:
         # Control signal update: Summing all channels that feed that input.
         # Like `coeffs[:, :, k] @ e_k` in `step`
         for input_idx in input_indices:
-            out_reg = regulator_output_registers[input_idx]
+            out_reg = controller_output_registers[input_idx]
             prev_u = f"prev_u_i{input_idx}"
 
             terms = []
@@ -217,15 +217,15 @@ class PIDRegulatorConfiguration:
         return "\n".join(lines)
 
 
-class PIDRegulatorState:
-    """! PID regulator state. """
+class PIDControllerState:
+    """! PID controller state. """
     def __init__(self,
         n_inputs: int,
         n_outputs: int,
         dtype: torch.dtype = torch.float64,
         device: torch.device = torch.device("cpu")
     ):
-        """! Constructor of the PIDRegulatorState class
+        """! Constructor of the PIDControllerState class
 
         @param n_inputs Number of inputs to the system
         @param n_outputs Number of the system outputs
@@ -240,33 +240,33 @@ class PIDRegulatorState:
         self.u_prev = torch.zeros((n_inputs,), dtype=self.dtype, device=self.device)
 
     @staticmethod
-    def initial_state_for(regulator_configuration: 'PIDRegulatorConfiguration') -> 'PIDRegulatorState':
-        """! Constructs DMC regulator zero state compatible with provided regulator configuration.
+    def initial_state_for(controller_configuration: 'PIDControllerConfiguration') -> 'PIDControllerState':
+        """! Constructs DMC controller zero state compatible with provided controller configuration.
 
-        @param regulator_configuration PID regulator configuration
-        @return regulator_state PID regulator state
+        @param controller_configuration PID controller configuration
+        @return controller_state PID controller state
         """
-        return PIDRegulatorState(
-            regulator_configuration.n_inputs,
-            regulator_configuration.n_outputs,
-            dtype=regulator_configuration.dtype,
-            device=regulator_configuration.device,
+        return PIDControllerState(
+            controller_configuration.n_inputs,
+            controller_configuration.n_outputs,
+            dtype=controller_configuration.dtype,
+            device=controller_configuration.device,
         )
 
-class PIDRegulatorClosedSystem:
-    """! Closed system with plant and PID regulator. """
+class PIDControllerClosedSystem:
+    """! Closed system with plant and PID controller. """
     def __init__(self,
         plant_dynamics: 'StateSpaceDynamics',
         initial_state: torch.Tensor,
-        config: 'PIDRegulatorConfiguration',
-        state: 'PIDRegulatorState'
+        config: 'PIDControllerConfiguration',
+        state: 'PIDControllerState'
     ):
-        """! Constructor of the PIDRegulatorClosedSystem class.
+        """! Constructor of the PIDControllerClosedSystem class.
 
         @param plant_dynamics Plant dynamics
         @param initial_state Initial plant state
-        @param config PID regulator configuration
-        @param state PID regulator state
+        @param config PID controller configuration
+        @param state PID controller state
         """
         if plant_dynamics.n_inputs != config.n_inputs:
             raise ValueError("Plant dynamics and PID configuration do not conform. Different assumed number of system inputs.")
@@ -294,12 +294,12 @@ class PIDRegulatorClosedSystem:
         # Validate current measured output y
         validate_tensor(y, "y", (self.plant.n_outputs,))
         if y.device != self.device:
-            raise ValueError(f"`y` must be on the same device as regulator ({self.device}), but it is on device {y.device}")
+            raise ValueError(f"`y` must be on the same device as controller ({self.device}), but it is on device {y.device}")
 
         # Validate setpoint
         validate_tensor(setpoint, "setpoint", (self.plant.n_outputs,))
         if setpoint.device != self.device:
-            raise ValueError(f"`setpoint` must be on the same device as regulator ({self.device}), but it is on device {setpoint.device}")
+            raise ValueError(f"`setpoint` must be on the same device as controller ({self.device}), but it is on device {setpoint.device}")
         
         e = setpoint - y
         u_new = self.config.coeffs[:, :, 0] @ e + self.config.coeffs[:, :, 1] @ self.state.e_prev + self.config.coeffs[:, :, 2] @ self.state.e_prev_prev + self.state.u_prev
@@ -327,7 +327,7 @@ class PIDRegulatorClosedSystem:
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """! Simulate a closed-loop system.
     
-        @param setpoints Setpoints for consecutive regulator steps
+        @param setpoints Setpoints for consecutive controller steps
             Shape: (length, n_outputs). If shorter than needed, extended with last element
         @param duration Total simulation time
         @param num_substeps Number of substeps per dt (increase to improve trajectory resolution)
@@ -365,7 +365,7 @@ class PIDRegulatorClosedSystem:
             discrete=False,
         )
     
-        # Number of regulator control computation steps
+        # Number of controller control computation steps
         num_steps = int(duration / self.config.t)
 
         # Extend / cut the setpoints tensor
@@ -393,7 +393,7 @@ class PIDRegulatorClosedSystem:
             # Get setpoint for this step
             stp = stp_full[i]
 
-            # Calculate control input from the regulator
+            # Calculate control input from the controller
             u_new = self.step(y, stp)
             self.plant.dynamics._validate_u(u_new)
 
@@ -429,6 +429,6 @@ class PIDRegulatorClosedSystem:
     def reset(
         self
     ) -> None:
-        """Reset the plant state and the regulator state. """
+        """Reset the plant state and the controller state. """
         self.plant.reset()
-        self.state = PIDRegulatorState.initial_state_for(self.config)
+        self.state = PIDControllerState.initial_state_for(self.config)
