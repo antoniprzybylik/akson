@@ -193,6 +193,16 @@ class PIDControllerConfiguration:
                 text += ".0"
             return f"({text})" if coeff < 0 else text
 
+        def _fmt_limit(value: float, name: str) -> str:
+            rounded = round(value)
+            if abs(value - rounded) > 1e-6:
+                warnings.warn(
+                    f"{name} = {value} is not a whole number, but the output "
+                    f"register is a DINT; rounding to {rounded} for the PLC limit.",
+                    RuntimeWarning,
+                )
+            return str(rounded)
+
         lines = []
         lines.append(f"{timer_name}(IN := TRUE, PT := {time_literal});")
         lines.append(f"IF {timer_name}.Q THEN")
@@ -234,6 +244,18 @@ class PIDControllerConfiguration:
             lines.append(f"    {prev_u} := {out_reg};")
             expr = " + ".join(terms) + f" + DINT_TO_REAL({prev_u})"
             lines.append(f"    {out_reg} := REAL_TO_DINT({expr});")
+
+            # Clamping anti-windup, works exactly like clamping in `step`
+            if self.u_max is not None:
+                limit = _fmt_limit(self.u_max[input_idx].item(), "u_max")
+                lines.append(f"    IF {out_reg} > {limit} THEN")
+                lines.append(f"        {out_reg} := {limit};")
+                lines.append("    END_IF;")
+            if self.u_min is not None:
+                limit = _fmt_limit(self.u_min[input_idx].item(), "u_min")
+                lines.append(f"    IF {out_reg} < {limit} THEN")
+                lines.append(f"        {out_reg} := {limit};")
+                lines.append("    END_IF;")
 
         lines.append(f"    {timer_name}(IN := FALSE);")
         lines.append("END_IF;")
